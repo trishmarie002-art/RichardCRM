@@ -1,41 +1,30 @@
 # Richard Roof CRM
 
-Private roofing CRM for managing leads, customers, pipeline stages, job values, and roof measurements.
+Private roofing lead and measurement workspace.
 
-## Current MVP
+## Run
 
-- Dashboard with lead and revenue KPIs
-- New roofing lead intake
-- Pipeline stages: New Lead, Inspection, Estimate Sent, Won
-- Customer/property records
-- Notes, lead source, contact info, and potential job value
-- Roof surface calculator using footprint area + roof pitch
-- Waste factor and roofing-square calculations
-- Local browser persistence for MVP testing
-- Responsive desktop/mobile interface
-
-## Run locally
-
-```bash
-npm install
+npm ci
 npm run dev
-```
 
-Open http://localhost:3000.
+## Connections
 
-## Planned production upgrades
+Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY for a dedicated RichardCRM project. Run supabase/schema.sql there. Without these settings the app uses browser-local demo data; this is not a private cloud deployment.
 
-1. Supabase authentication and persistent database
-2. Address autocomplete/geocoding
-3. Satellite/aerial map roof tracing
-4. Polygon area calculation from map geometry
-5. Multiple roof facets, pitch, ridge, hip, valley, eave and rake measurements
-6. Photo/document uploads
-7. Inspection appointments and calendar
-8. Estimate builder and PDF proposals
-9. Lead import/export
-10. Job activity timeline and follow-up reminders
+For satellite tracing set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY. Enable Maps JavaScript API and Geocoding API, activate Google billing, and restrict the browser key to your website domains and those APIs. Do not commit credentials. The key is intentionally public in the browser and must have website restrictions.
 
-## Roof measurement note
+## Roof workflow
 
-The current calculator converts known horizontal roof footprint area into estimated sloped roof area using pitch factors. It does not claim to derive an accurate roof measurement from an address alone. Aerial imagery and polygon tracing should be added before using it as a remote measurement workflow.
+Choose a customer in Roof Measure. Find the property address, confirm the correct roof, click Trace facet, click corners in order, enter the inspected pitch, and Add facet. Repeat for each facet without overlapping. Alternatively enter known horizontal footprint areas manually. Save Measurement attaches the snapshot to that customer. Selecting that customer again loads the latest saved snapshot, from Supabase when configured or from this browser in demo mode.
+
+Roof surface uses footprint × sqrt(1 + (pitch/12)^2). Waste increases material quantities only. Squares shown include waste; bundles assume three per square and must be checked against the chosen product.
+
+Satellite-derived results are estimates, not certified measurement reports. Pitch is entered manually. Ridge/hip/valley/eave/rake classifications and slope-corrected linear measurements are not implemented yet. Facets do not automatically detect overlap or roof geometry. Field verification is required before ordering materials.
+
+## Privacy
+
+Cloud access uses Supabase authentication and ownership policies. Measurements can only reference a lead owned by the same user. Keep open registration disabled if this workspace should be limited to your own account. Demo data stays in browser storage and can be lost when browser data is cleared.
+
+## Validation
+
+Production build and TypeScript checks can be run with npm run build. Live satellite and cloud integration checks require configured service credentials.
