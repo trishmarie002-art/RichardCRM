@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Lead = {
-  id: number;
+  id: string;
   name: string;
   phone: string;
   email: string;
@@ -25,7 +26,7 @@ const statuses = ["New Lead", "Inspection", "Estimate Sent", "Won"];
 
 const starterLeads: Lead[] = [
   {
-    id: 1,
+    id: "demo-1",
     name: "Maria Lopez",
     phone: "210-555-0142",
     email: "maria@example.com",
@@ -36,7 +37,7 @@ const starterLeads: Lead[] = [
     notes: "Wind damage. Wants inspection."
   },
   {
-    id: 2,
+    id: "demo-2",
     name: "James Carter",
     phone: "210-555-0199",
     email: "james@example.com",
@@ -47,7 +48,7 @@ const starterLeads: Lead[] = [
     notes: "Inspection appointment Thursday."
   },
   {
-    id: 3,
+    id: "demo-3",
     name: "Angela Ruiz",
     phone: "210-555-0114",
     email: "angela@example.com",
@@ -78,27 +79,92 @@ const pitchFactor: Record<number, number> = {
 const money = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n || 0);
 
+function mapDbLead(row: any): Lead {
+  return {
+    id: String(row.id),
+    name: row.name ?? "",
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    address: row.address ?? "",
+    status: row.status ?? "New Lead",
+    source: row.source ?? "Other",
+    value: Number(row.potential_value ?? 0),
+    notes: row.notes ?? ""
+  };
+}
+
 export default function Home() {
+  const supabase = useMemo(() => createClient(), []);
+  const cloudMode = isSupabaseConfigured();
+
   const [tab, setTab] = useState("Dashboard");
-  const [leads, setLeads] = useState<Lead[]>(starterLeads);
+  const [leads, setLeads] = useState<Lead[]>(cloudMode ? [] : starterLeads);
   const [showForm, setShowForm] = useState(false);
   const [sections, setSections] = useState<RoofSection[]>([
     { id: 1, name: "Main Roof", footprintSqFt: 1800, pitch: 6 }
   ]);
   const [waste, setWaste] = useState(10);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(!cloudMode);
+  const [authError, setAuthError] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("richardcrm.leads");
-    if (saved) {
-      try {
-        setLeads(JSON.parse(saved));
-      } catch {}
+    if (!cloudMode) {
+      const saved = localStorage.getItem("richardcrm.leads");
+      if (saved) {
+        try {
+          setLeads(JSON.parse(saved));
+        } catch {}
+      }
+      return;
     }
-  }, []);
+
+    if (!supabase) return;
+
+    const load = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id ?? null;
+      setUserId(uid);
+
+      if (uid) {
+        const { data, error } = await supabase
+          .from("leads")
+          .select("*")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) setLeads(data.map(mapDbLead));
+        if (error) setAuthError(error.message);
+      }
+      setAuthReady(true);
+    };
+
+    load();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const uid = session?.user?.id ?? null;
+      setUserId(uid);
+      if (!uid) {
+        setLeads([]);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("leads")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (data) setLeads(data.map(mapDbLead));
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, [cloudMode, supabase]);
 
   useEffect(() => {
-    localStorage.setItem("richardcrm.leads", JSON.stringify(leads));
-  }, [leads]);
+    if (!cloudMode) {
+      localStorage.setItem("richardcrm.leads", JSON.stringify(leads));
+    }
+  }, [cloudMode, leads]);
 
   const openPipeline = leads.filter((l) => l.status !== "Won").reduce((sum, l) => sum + l.value, 0);
   const wonRevenue = leads.filter((l) => l.status === "Won").reduce((sum, l) => sum + l.value, 0);
@@ -107,46 +173,160 @@ export default function Home() {
   const roofTotals = useMemo(() => {
     const raw = sections.reduce((sum, s) => sum + (Number(s.footprintSqFt) || 0) * (pitchFactor[s.pitch] || 1), 0);
     const withWaste = raw * (1 + waste / 100);
-    return {
-      raw,
-      withWaste,
-      squares: withWaste / 100
-    };
+    return { raw, withWaste, squares: withWaste / 100 };
   }, [sections, waste]);
 
-  function addLead(formData: FormData) {
-    const lead: Lead = {
-      id: Date.now(),
+  async function signIn(formData: FormData) {
+    if (!supabase) return;
+    setAuthError("");
+    setSyncing(true);
+
+    const email = String(formData.get("email") || "");
+    const password = String(formData.get("password") || "");
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setAuthError(error.message);
+    setSyncing(false);
+  }
+
+  async function signUp(formData: FormData) {
+    if (!supabase) return;
+    setAuthError("");
+    setSyncing(true);
+
+    const email = String(formData.get("email") || "");
+    const password = String(formData.get("password") || "");
+
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) setAuthError(error.message);
+    else setAuthError("Account created. If email confirmation is enabled, check your inbox before signing in.");
+
+    setSyncing(false);
+  }
+
+  async function signOut() {
+    if (supabase) await supabase.auth.signOut();
+  }
+
+  async function addLead(formData: FormData) {
+    const draft = {
       name: String(formData.get("name") || ""),
       phone: String(formData.get("phone") || ""),
       email: String(formData.get("email") || ""),
       address: String(formData.get("address") || ""),
       status: "New Lead",
       source: String(formData.get("source") || "Other"),
-      value: Number(formData.get("value") || 0),
+      potential_value: Number(formData.get("value") || 0),
       notes: String(formData.get("notes") || "")
     };
-    setLeads((current) => [lead, ...current]);
+
+    if (cloudMode && supabase && userId) {
+      setSyncing(true);
+      const { data, error } = await supabase
+        .from("leads")
+        .insert({ ...draft, user_id: userId })
+        .select()
+        .single();
+
+      if (data) setLeads((current) => [mapDbLead(data), ...current]);
+      if (error) setAuthError(error.message);
+      setSyncing(false);
+    } else {
+      const lead: Lead = {
+        id: Date.now().toString(),
+        name: draft.name,
+        phone: draft.phone,
+        email: draft.email,
+        address: draft.address,
+        status: draft.status,
+        source: draft.source,
+        value: draft.potential_value,
+        notes: draft.notes
+      };
+      setLeads((current) => [lead, ...current]);
+    }
+
     setShowForm(false);
   }
 
-  function moveLead(id: number, direction: number) {
-    setLeads((current) =>
-      current.map((lead) => {
-        if (lead.id !== id) return lead;
-        const index = statuses.indexOf(lead.status);
-        const next = Math.max(0, Math.min(statuses.length - 1, index + direction));
-        return { ...lead, status: statuses[next] };
-      })
-    );
+  async function moveLead(id: string, direction: number) {
+    const lead = leads.find((item) => item.id === id);
+    if (!lead) return;
+
+    const index = statuses.indexOf(lead.status);
+    const nextStatus = statuses[Math.max(0, Math.min(statuses.length - 1, index + direction))];
+
+    setLeads((current) => current.map((item) => item.id === id ? { ...item, status: nextStatus } : item));
+
+    if (cloudMode && supabase && userId) {
+      const { error } = await supabase
+        .from("leads")
+        .update({ status: nextStatus, updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      if (error) setAuthError(error.message);
+    }
   }
 
-  function deleteLead(id: number) {
+  async function deleteLead(id: string) {
     setLeads((current) => current.filter((lead) => lead.id !== id));
+
+    if (cloudMode && supabase && userId) {
+      const { error } = await supabase.from("leads").delete().eq("id", id);
+      if (error) setAuthError(error.message);
+    }
   }
 
   function updateSection(id: number, patch: Partial<RoofSection>) {
     setSections((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }
+
+  async function saveMeasurement() {
+    if (!cloudMode || !supabase || !userId) {
+      setAuthError("Cloud storage is not connected yet. The calculator still works in local mode.");
+      return;
+    }
+
+    setSyncing(true);
+    const footprint = sections.reduce((sum, section) => sum + Number(section.footprintSqFt || 0), 0);
+
+    const { error } = await supabase.from("roof_measurements").insert({
+      user_id: userId,
+      waste_percent: waste,
+      footprint_sqft: footprint,
+      roof_surface_sqft: roofTotals.withWaste,
+      roofing_squares: roofTotals.squares,
+      sections
+    });
+
+    setAuthError(error ? error.message : "Roof measurement saved.");
+    setSyncing(false);
+  }
+
+  if (cloudMode && !authReady) {
+    return <div className="empty">Loading secure CRM…</div>;
+  }
+
+  if (cloudMode && !userId) {
+    return (
+      <div className="app" style={{ display: "grid", placeItems: "center", gridTemplateColumns: "1fr", padding: 20 }}>
+        <div className="card" style={{ width: "min(480px, 100%)" }}>
+          <div className="logo" style={{ marginBottom: 8 }}>Richard <span>Roof CRM</span></div>
+          <p className="muted">Private sign-in for your roofing leads and measurements.</p>
+
+          <form action={signIn}>
+            <div className="field"><label>Email</label><input name="email" type="email" required /></div>
+            <div className="field" style={{ marginTop: 12 }}><label>Password</label><input name="password" type="password" minLength={6} required /></div>
+            <div className="actions">
+              <button className="btn secondary" formAction={signUp} disabled={syncing}>Create Account</button>
+              <button className="btn" disabled={syncing}>{syncing ? "Working…" : "Sign In"}</button>
+            </div>
+          </form>
+
+          {authError && <div className="notice" style={{ marginTop: 14 }}>{authError}</div>}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -162,6 +342,11 @@ export default function Home() {
             </button>
           ))}
         </div>
+
+        <div style={{ marginTop: 24 }}>
+          <div className="small muted">{cloudMode ? "Cloud database connected" : "Local demo storage"}</div>
+          {cloudMode && <button className="mini" style={{ marginTop: 8 }} onClick={signOut}>Sign Out</button>}
+        </div>
       </aside>
 
       <main className="main">
@@ -172,6 +357,8 @@ export default function Home() {
           </div>
           <button className="btn" onClick={() => setShowForm(true)}>+ New Lead</button>
         </div>
+
+        {authError && <div className="notice" style={{ marginBottom: 16 }}>{authError}</div>}
 
         {tab === "Dashboard" && (
           <>
@@ -295,7 +482,7 @@ export default function Home() {
               </div>
 
               <div className="notice" style={{ marginBottom: 14 }}>
-                This first version calculates roof surface area from measured footprint area and pitch. Satellite tracing and address-based aerial imagery can be plugged in next; this calculator does not pretend an address alone can produce an accurate roof measurement.
+                This calculator converts horizontal footprint areas into estimated sloped roof area. Satellite tracing will be the next measurement upgrade.
               </div>
 
               <div className="measureRows">
@@ -339,6 +526,10 @@ export default function Home() {
               <div className="kpi"><span>With waste</span><strong>{Math.round(roofTotals.withWaste).toLocaleString()} sq ft</strong></div>
               <div className="kpi"><span>Squares</span><strong>{roofTotals.squares.toFixed(2)}</strong></div>
               <div className="kpi"><span>Bundles @ 3/square</span><strong>{Math.ceil(roofTotals.squares * 3)}</strong></div>
+
+              <button className="btn" style={{ width: "100%", marginTop: 14 }} onClick={saveMeasurement} disabled={syncing}>
+                {syncing ? "Saving…" : "Save Measurement"}
+              </button>
             </div>
           </div>
         )}
@@ -364,7 +555,7 @@ export default function Home() {
               </div>
               <div className="actions">
                 <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
-                <button className="btn" type="submit">Save Lead</button>
+                <button className="btn" type="submit" disabled={syncing}>{syncing ? "Saving…" : "Save Lead"}</button>
               </div>
             </form>
           </div>
