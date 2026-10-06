@@ -1,5 +1,6 @@
 "use client";
 
+import RoofMap, { type RoofPoint } from "@/components/RoofMap";
 import { useEffect, useMemo, useState } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -20,6 +21,7 @@ type RoofSection = {
   name: string;
   footprintSqFt: number;
   pitch: number;
+  points?: RoofPoint[];
 };
 
 const statuses = ["New Lead", "Inspection", "Estimate Sent", "Won"];
@@ -60,22 +62,6 @@ const starterLeads: Lead[] = [
   }
 ];
 
-const pitchFactor: Record<number, number> = {
-  0: 1,
-  1: 1.003,
-  2: 1.014,
-  3: 1.031,
-  4: 1.054,
-  5: 1.083,
-  6: 1.118,
-  7: 1.158,
-  8: 1.202,
-  9: 1.25,
-  10: 1.302,
-  11: 1.357,
-  12: 1.414
-};
-
 const money = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n || 0);
 
@@ -103,6 +89,8 @@ export default function Home() {
   const [sections, setSections] = useState<RoofSection[]>([
     { id: 1, name: "Main Roof", footprintSqFt: 1800, pitch: 6 }
   ]);
+  const [selectedLeadId, setSelectedLeadId] = useState("");
+  const [measurementReady, setMeasurementReady] = useState(false);
   const [waste, setWaste] = useState(10);
   const [userId, setUserId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(!cloudMode);
@@ -122,42 +110,19 @@ export default function Home() {
 
     if (!supabase) return;
 
-    const load = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData.user?.id ?? null;
-      setUserId(uid);
-
-      if (uid) {
-        const { data, error } = await supabase
-          .from("leads")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data) setLeads(data.map(mapDbLead));
-        if (error) setAuthError(error.message);
-      }
+    let active = true;
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (!active) return;
+      setUserId(data.user?.id ?? null);
+      if (error) setAuthError(error.message);
       setAuthReady(true);
-    };
-
-    load();
-
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const uid = session?.user?.id ?? null;
-      setUserId(uid);
-      if (!uid) {
-        setLeads([]);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (data) setLeads(data.map(mapDbLead));
     });
-
-    return () => listener.subscription.unsubscribe();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+      setAuthReady(true);
+      if (!session?.user) { setLeads([]); setSelectedLeadId(""); }
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
   }, [cloudMode, supabase]);
 
   useEffect(() => {
@@ -166,12 +131,44 @@ export default function Home() {
     }
   }, [cloudMode, leads]);
 
+  useEffect(() => {
+    if (!cloudMode || !supabase || !userId) return;
+    let active = true;
+    supabase.from("leads").select("*").order("created_at", { ascending: false }).then(({ data, error }) => {
+      if (!active) return;
+      if (error) setAuthError(error.message);
+      else if (data) setLeads(data.map(mapDbLead));
+    });
+    return () => { active = false; };
+  }, [cloudMode, supabase, userId]);
+
+  useEffect(() => {
+    let active = true;
+    setMeasurementReady(false); setSections([]); setWaste(10);
+    const load = async () => {
+      try {
+        if (cloudMode && supabase && userId && selectedLeadId) {
+          const {data, error} = await supabase.from("roof_measurements").select("sections,waste_percent").eq("lead_id",selectedLeadId).order("created_at",{ascending:false}).limit(1).maybeSingle();
+          if (!active) return;
+          if (error) throw error;
+          if (data) { setSections(data.sections); setWaste(Number(data.waste_percent)); }
+        } else if (!cloudMode && selectedLeadId) {
+          const saved = localStorage.getItem("richardcrm.measurements.local." + selectedLeadId);
+          if (saved) { const record=JSON.parse(saved); setSections(record.sections || []); setWaste(record.waste_percent ?? 10); }
+        }
+      } catch (error) { if (active) setAuthError(error instanceof Error ? error.message : "Could not load saved measurement."); }
+      finally { if (active) setMeasurementReady(true); }
+    };
+    void load();
+    return () => { active = false; };
+  }, [selectedLeadId, userId, cloudMode, supabase]);
+
   const openPipeline = leads.filter((l) => l.status !== "Won").reduce((sum, l) => sum + l.value, 0);
   const wonRevenue = leads.filter((l) => l.status === "Won").reduce((sum, l) => sum + l.value, 0);
   const inspectionCount = leads.filter((l) => l.status === "Inspection").length;
 
   const roofTotals = useMemo(() => {
-    const raw = sections.reduce((sum, s) => sum + (Number(s.footprintSqFt) || 0) * (pitchFactor[s.pitch] || 1), 0);
+    const raw = sections.reduce((sum, s) => sum + (Number(s.footprintSqFt) || 0) * Math.sqrt(1 + (s.pitch / 12) ** 2), 0);
     const withWaste = raw * (1 + waste / 100);
     return { raw, withWaste, squares: withWaste / 100 };
   }, [sections, waste]);
@@ -282,25 +279,28 @@ export default function Home() {
   }
 
   async function saveMeasurement() {
-    if (!cloudMode || !supabase || !userId) {
-      setAuthError("Cloud storage is not connected yet. The calculator still works in local mode.");
-      return;
+    const lead = leads.find(item => item.id === selectedLeadId);
+    if (!lead || !sections.length) {
+      setAuthError("Choose a customer and add at least one roof section before saving."); return;
     }
-
+    if (sections.some(section => !Number.isFinite(section.footprintSqFt) || section.footprintSqFt <= 0 || !Number.isFinite(section.pitch) || section.pitch < 0 || section.pitch > 12)) {
+      setAuthError("Every roof section needs a positive area and pitch between 0/12 and 12/12."); return;
+    }
+    const record = {
+      lead_id: lead.id, property_address: lead.address, waste_percent: waste,
+      footprint_sqft: sections.reduce((sum, section) => sum + section.footprintSqFt, 0),
+      roof_surface_sqft: roofTotals.raw, roofing_squares: roofTotals.squares, sections
+    };
     setSyncing(true);
-    const footprint = sections.reduce((sum, section) => sum + Number(section.footprintSqFt || 0), 0);
-
-    const { error } = await supabase.from("roof_measurements").insert({
-      user_id: userId,
-      waste_percent: waste,
-      footprint_sqft: footprint,
-      roof_surface_sqft: roofTotals.withWaste,
-      roofing_squares: roofTotals.squares,
-      sections
-    });
-
-    setAuthError(error ? error.message : "Roof measurement saved.");
-    setSyncing(false);
+    try {
+      if (cloudMode && supabase && userId) {
+        const { error } = await supabase.from("roof_measurements").insert({ ...record, user_id: userId });
+        if (error) throw error;
+      }
+      if (!cloudMode) localStorage.setItem("richardcrm.measurements.local." + selectedLeadId, JSON.stringify(record));
+      setAuthError(cloudMode ? "Measurement saved to this customer in cloud storage." : "Measurement saved to this customer in this browser.");
+    } catch (error) { setAuthError(error instanceof Error ? error.message : "Unable to save measurement."); }
+    finally { setSyncing(false); }
   }
 
   if (cloudMode && !authReady) {
@@ -464,6 +464,16 @@ export default function Home() {
         )}
 
         {tab === "Roof Measure" && (
+          <>
+          <div className="card" style={{marginBottom:16}}>
+            <div className="field"><label htmlFor="measurement-customer">Customer / property</label>
+              <select id="measurement-customer" value={selectedLeadId} onChange={event => setSelectedLeadId(event.target.value)}>
+                <option value="">Choose a customer</option>
+                {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.name} — {lead.address}</option>)}
+              </select>
+            </div>
+          </div>
+          <RoofMap key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} />
           <div className="measureLayout">
             <div className="card">
               <div className="sectionTitle">
@@ -482,7 +492,7 @@ export default function Home() {
               </div>
 
               <div className="notice" style={{ marginBottom: 14 }}>
-                This calculator converts horizontal footprint areas into estimated sloped roof area. Satellite tracing will be the next measurement upgrade.
+                This calculator converts horizontal footprint areas into estimated sloped roof area. Use manually measured footprints or add facets from the satellite workspace above. Waste applies to material quantities, not roof surface area.
               </div>
 
               <div className="measureRows">
@@ -527,11 +537,12 @@ export default function Home() {
               <div className="kpi"><span>Squares</span><strong>{roofTotals.squares.toFixed(2)}</strong></div>
               <div className="kpi"><span>Bundles @ 3/square</span><strong>{Math.ceil(roofTotals.squares * 3)}</strong></div>
 
-              <button className="btn" style={{ width: "100%", marginTop: 14 }} onClick={saveMeasurement} disabled={syncing}>
+              <button className="btn" style={{ width: "100%", marginTop: 14 }} onClick={saveMeasurement} disabled={syncing || !measurementReady || !selectedLeadId || sections.length === 0}>
                 {syncing ? "Saving…" : "Save Measurement"}
               </button>
             </div>
           </div>
+          </>
         )}
       </main>
 
