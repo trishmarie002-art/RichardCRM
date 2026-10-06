@@ -78,14 +78,24 @@ drop policy if exists "roof_measurements_insert_own" on public.roof_measurements
 create policy "roof_measurements_insert_own"
 on public.roof_measurements for insert
 to authenticated
-with check ((select auth.uid()) = user_id);
+with check (
+  (select auth.uid()) = user_id
+  and (lead_id is null or exists (
+    select 1 from public.leads where leads.id = lead_id and leads.user_id = (select auth.uid())
+  ))
+);
 
 drop policy if exists "roof_measurements_update_own" on public.roof_measurements;
 create policy "roof_measurements_update_own"
 on public.roof_measurements for update
 to authenticated
 using ((select auth.uid()) = user_id)
-with check ((select auth.uid()) = user_id);
+with check (
+  (select auth.uid()) = user_id
+  and (lead_id is null or exists (
+    select 1 from public.leads where leads.id = lead_id and leads.user_id = (select auth.uid())
+  ))
+);
 
 drop policy if exists "roof_measurements_delete_own" on public.roof_measurements;
 create policy "roof_measurements_delete_own"
@@ -96,3 +106,4 @@ using ((select auth.uid()) = user_id);
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.leads to authenticated;
 grant select, insert, update, delete on public.roof_measurements to authenticated;
+
