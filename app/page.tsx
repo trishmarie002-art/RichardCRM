@@ -99,6 +99,7 @@ export default function Home() {
   const [sections, setSections] = useState<RoofSection[]>([
     { id: 1, name: "Main Roof", footprintSqFt: 1800, pitch: 6 }
   ]);
+  const [customerContext,setCustomerContext]=useState("");
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [edges, setEdges] = useState<RoofEdge[]>([]);
   const [measurementReady, setMeasurementReady] = useState(false);
@@ -280,6 +281,7 @@ export default function Home() {
         localStorage.setItem("richardcrm.jobs.v1",JSON.stringify(jobs.filter((job: {lead_id: string})=>job.lead_id!==id)));
       }
       setLeads(current=>current.filter(item=>item.id!==id));
+      if(customerContext===id)setCustomerContext("");
       if(selectedLeadId===id) setSelectedLeadId("");
     } catch(error) { setAuthError(error instanceof Error?error.message:"Could not delete lead."); }
     finally { setSyncing(false); }
@@ -479,11 +481,11 @@ export default function Home() {
           </div>
         )}
 
-        {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} />}
-        {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} />}
+        {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
+        {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} />}
-        {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} />}
-        {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} />}
+        {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} initialCustomerId={customerContext} onSelect={setCustomerContext} onOpen={setTab} />}
+        {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Roof Measure" && (
           <>
           <div className="card" style={{marginBottom:16}}>
