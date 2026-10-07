@@ -1,5 +1,6 @@
 "use client";
 
+import Jobs from "@/components/Jobs";
 import DailySchedule from "@/components/DailySchedule";
 import RoofReport from "@/components/RoofReport";
 import { edgeLength, type RoofEdge } from "@/lib/roof";
@@ -250,7 +251,7 @@ export default function Home() {
   }
 
   async function deleteLead(id: string) {
-    if (syncing || !window.confirm("Delete this customer and their measurements, estimates and activity history? Uploaded files must be removed first.")) return;
+    if (syncing || !window.confirm("Delete this customer and their measurements, estimates, jobs and activity history? Uploaded files must be removed first.")) return;
     setSyncing(true);
     try {
       if (cloudMode) {
@@ -263,6 +264,8 @@ export default function Home() {
       } else {
         localStorage.removeItem("richardcrm.measurements.local."+id);
         localStorage.removeItem("richardcrm.estimates.v1."+id);
+        const jobs = JSON.parse(localStorage.getItem("richardcrm.jobs.v1") || "[]");
+        localStorage.setItem("richardcrm.jobs.v1",JSON.stringify(jobs.filter((job: {lead_id: string})=>job.lead_id!==id)));
       }
       setLeads(current=>current.filter(item=>item.id!==id));
       if(selectedLeadId===id) setSelectedLeadId("");
@@ -335,7 +338,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -464,6 +467,7 @@ export default function Home() {
           </div>
         )}
 
+        {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} />}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} />}
         {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} />}
