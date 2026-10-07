@@ -1,5 +1,6 @@
 "use client";
 
+import EstimateBuilder from "@/components/EstimateBuilder";
 import RoofMap, { type RoofPoint } from "@/components/RoofMap";
 import { useEffect, useMemo, useState } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -85,6 +86,9 @@ export default function Home() {
 
   const [tab, setTab] = useState("Dashboard");
   const [leads, setLeads] = useState<Lead[]>(cloudMode ? [] : starterLeads);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [search, setSearch] = useState("");
+  const [localReady, setLocalReady] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [sections, setSections] = useState<RoofSection[]>([
     { id: 1, name: "Main Roof", footprintSqFt: 1800, pitch: 6 }
@@ -105,6 +109,7 @@ export default function Home() {
           setLeads(JSON.parse(saved));
         } catch {}
       }
+      setLocalReady(true);
       return;
     }
 
@@ -126,10 +131,10 @@ export default function Home() {
   }, [cloudMode, supabase]);
 
   useEffect(() => {
-    if (!cloudMode) {
+    if (!cloudMode && localReady) {
       localStorage.setItem("richardcrm.leads", JSON.stringify(leads));
     }
-  }, [cloudMode, leads]);
+  }, [cloudMode, leads, localReady]);
 
   useEffect(() => {
     if (!cloudMode || !supabase || !userId) return;
@@ -186,21 +191,6 @@ export default function Home() {
     setSyncing(false);
   }
 
-  async function signUp(formData: FormData) {
-    if (!supabase) return;
-    setAuthError("");
-    setSyncing(true);
-
-    const email = String(formData.get("email") || "");
-    const password = String(formData.get("password") || "");
-
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) setAuthError(error.message);
-    else setAuthError("Account created. If email confirmation is enabled, check your inbox before signing in.");
-
-    setSyncing(false);
-  }
-
   async function signOut() {
     if (supabase) await supabase.auth.signOut();
   }
@@ -211,67 +201,65 @@ export default function Home() {
       phone: String(formData.get("phone") || ""),
       email: String(formData.get("email") || ""),
       address: String(formData.get("address") || ""),
-      status: "New Lead",
+      status: editingLead?.status || "New Lead",
       source: String(formData.get("source") || "Other"),
       potential_value: Number(formData.get("value") || 0),
       notes: String(formData.get("notes") || "")
     };
 
-    if (cloudMode && supabase && userId) {
-      setSyncing(true);
-      const { data, error } = await supabase
-        .from("leads")
-        .insert({ ...draft, user_id: userId })
-        .select()
-        .single();
-
-      if (data) setLeads((current) => [mapDbLead(data), ...current]);
-      if (error) setAuthError(error.message);
-      setSyncing(false);
-    } else {
-      const lead: Lead = {
-        id: Date.now().toString(),
-        name: draft.name,
-        phone: draft.phone,
-        email: draft.email,
-        address: draft.address,
-        status: draft.status,
-        source: draft.source,
-        value: draft.potential_value,
-        notes: draft.notes
-      };
-      setLeads((current) => [lead, ...current]);
-    }
-
-    setShowForm(false);
+    setSyncing(true);
+    try {
+      if (cloudMode) {
+        if (!supabase || !userId) throw new Error("Sign in before saving a lead.");
+        const query = editingLead
+          ? supabase.from("leads").update({...draft,updated_at:new Date().toISOString()}).eq("id",editingLead.id)
+          : supabase.from("leads").insert({...draft,user_id:userId});
+        const {data,error} = await query.select().single();
+        if (error) throw error;
+        const saved = mapDbLead(data);
+        setLeads(current=>editingLead?current.map(item=>item.id===saved.id?saved:item):[saved,...current]);
+      } else {
+        const saved: Lead = {...draft,id:editingLead?.id || crypto.randomUUID(),value:draft.potential_value};
+        setLeads(current=>editingLead?current.map(item=>item.id===saved.id?saved:item):[saved,...current]);
+      }
+      setShowForm(false); setEditingLead(null); setAuthError("");
+    } catch (error) { setAuthError(error instanceof Error?error.message:"Could not save lead."); }
+    finally { setSyncing(false); }
   }
 
   async function moveLead(id: string, direction: number) {
-    const lead = leads.find((item) => item.id === id);
-    if (!lead) return;
-
-    const index = statuses.indexOf(lead.status);
-    const nextStatus = statuses[Math.max(0, Math.min(statuses.length - 1, index + direction))];
-
-    setLeads((current) => current.map((item) => item.id === id ? { ...item, status: nextStatus } : item));
-
-    if (cloudMode && supabase && userId) {
-      const { error } = await supabase
-        .from("leads")
-        .update({ status: nextStatus, updated_at: new Date().toISOString() })
-        .eq("id", id);
-
-      if (error) setAuthError(error.message);
-    }
+    const lead = leads.find(item=>item.id===id);
+    if (!lead || syncing) return;
+    const index=statuses.indexOf(lead.status);
+    const nextStatus=statuses[Math.max(0,Math.min(statuses.length-1,index+direction))];
+    setSyncing(true);
+    try {
+      if (cloudMode) {
+        if (!supabase || !userId) throw new Error("Sign in first.");
+        const {error} = await supabase.from("leads").update({status:nextStatus,updated_at:new Date().toISOString()}).eq("id",id).select("id").single();
+        if (error) throw error;
+      }
+      setLeads(current=>current.map(item=>item.id===id?{...item,status:nextStatus}:item));
+    } catch(error) { setAuthError(error instanceof Error?error.message:"Could not update stage."); }
+    finally { setSyncing(false); }
   }
 
   async function deleteLead(id: string) {
-    setLeads((current) => current.filter((lead) => lead.id !== id));
-
-    if (cloudMode && supabase && userId) {
-      const { error } = await supabase.from("leads").delete().eq("id", id);
-      if (error) setAuthError(error.message);
-    }
+    if (syncing || !window.confirm("Delete this customer and their saved roof measurements and estimates?")) return;
+    setSyncing(true);
+    try {
+      if (cloudMode) {
+        if (!supabase || !userId) throw new Error("Sign in first.");
+        const {error}=await supabase.from("leads").delete().eq("id",id).select("id").single();
+        if (error) throw error;
+      } else {
+        localStorage.removeItem("richardcrm.measurements.local."+id);
+        localStorage.removeItem("richardcrm.estimates.v1."+id);
+      }
+      setLeads(current=>current.filter(item=>item.id!==id));
+      if(selectedLeadId===id) setSelectedLeadId("");
+    } catch(error) { setAuthError(error instanceof Error?error.message:"Could not delete lead."); }
+    finally { setSyncing(false); }
   }
 
   function updateSection(id: number, patch: Partial<RoofSection>) {
@@ -318,7 +306,7 @@ export default function Home() {
             <div className="field"><label>Email</label><input name="email" type="email" required /></div>
             <div className="field" style={{ marginTop: 12 }}><label>Password</label><input name="password" type="password" minLength={6} required /></div>
             <div className="actions">
-              <button className="btn secondary" formAction={signUp} disabled={syncing}>Create Account</button>
+
               <button className="btn" disabled={syncing}>{syncing ? "Working…" : "Sign In"}</button>
             </div>
           </form>
@@ -336,7 +324,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -355,7 +343,7 @@ export default function Home() {
             <h1>{tab}</h1>
             <div className="muted">Manage roofing leads, customers, estimates and roof measurements.</div>
           </div>
-          <button className="btn" onClick={() => setShowForm(true)}>+ New Lead</button>
+          <button className="btn" onClick={() => { setEditingLead(null); setShowForm(true); }}>+ New Lead</button>
         </div>
 
         {authError && <div className="notice" style={{ marginBottom: 16 }}>{authError}</div>}
@@ -442,19 +430,21 @@ export default function Home() {
         {tab === "Customers" && (
           <div className="card">
             <div className="sectionTitle"><h2>Customer & Property Records</h2></div>
+            <div className="field"><label htmlFor="customer-search">Search customers</label><input id="customer-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Name, address, phone or email" /></div>
             <div className="tableWrap">
               <table className="table">
                 <thead>
-                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Property</th><th>Notes</th></tr>
+                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Property</th><th>Notes</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                  {leads.map((lead) => (
+                  {leads.filter(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
                     <tr key={lead.id}>
                       <td><strong>{lead.name}</strong></td>
                       <td>{lead.phone || "—"}</td>
                       <td>{lead.email || "—"}</td>
                       <td>{lead.address || "—"}</td>
                       <td>{lead.notes || "—"}</td>
+                      <td><button className="mini" onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -463,6 +453,7 @@ export default function Home() {
           </div>
         )}
 
+        {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} />}
         {tab === "Roof Measure" && (
           <>
           <div className="card" style={{marginBottom:16}}>
@@ -549,20 +540,20 @@ export default function Home() {
       {showForm && (
         <div className="modalBack" onClick={() => setShowForm(false)}>
           <div className="card modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sectionTitle"><h2>Add Roofing Lead</h2></div>
-            <form action={addLead}>
+            <div className="sectionTitle"><h2>{editingLead ? "Edit Customer" : "Add Roofing Lead"}</h2></div>
+            <form action={addLead} key={editingLead?.id || "new"}>
               <div className="formGrid">
-                <div className="field"><label>Customer name</label><input name="name" required /></div>
-                <div className="field"><label>Phone</label><input name="phone" /></div>
-                <div className="field"><label>Email</label><input name="email" type="email" /></div>
+                <div className="field"><label>Customer name</label><input name="name" defaultValue={editingLead?.name ?? ""} required /></div>
+                <div className="field"><label>Phone</label><input name="phone" defaultValue={editingLead?.phone ?? ""} /></div>
+                <div className="field"><label>Email</label><input name="email" defaultValue={editingLead?.email ?? ""} type="email" /></div>
                 <div className="field"><label>Lead source</label>
-                  <select name="source" defaultValue="Facebook">
+                  <select name="source" defaultValue={editingLead?.source || "Facebook"}>
                     <option>Facebook</option><option>Google</option><option>Referral</option><option>Door Knock</option><option>Other</option>
                   </select>
                 </div>
-                <div className="field full"><label>Property address</label><input name="address" /></div>
-                <div className="field"><label>Potential job value</label><input name="value" type="number" min="0" /></div>
-                <div className="field full"><label>Notes</label><textarea name="notes" /></div>
+                <div className="field full"><label>Property address</label><input name="address" defaultValue={editingLead?.address ?? ""} /></div>
+                <div className="field"><label>Potential job value</label><input name="value" defaultValue={editingLead?.value ?? ""} type="number" min="0" /></div>
+                <div className="field full"><label>Notes</label><textarea name="notes" defaultValue={editingLead?.notes || ""} /></div>
               </div>
               <div className="actions">
                 <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
