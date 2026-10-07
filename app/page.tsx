@@ -203,6 +203,14 @@ export default function Home() {
   }
 
   async function addLead(formData: FormData) {
+    const amountText = String(formData.get("value") || "").trim().replace(/^\$\s*/, "");
+    if (amountText && !/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(amountText)) {
+      setAuthError("Enter a valid US dollar amount, such as $10,000 or $10,000.50."); return;
+    }
+    const jobValue = Number(amountText.replace(/,/g, "") || 0);
+    if (!Number.isFinite(jobValue) || jobValue > 9999999999.99) {
+      setAuthError("Potential job value must be between $0 and $9,999,999,999.99."); return;
+    }
     const draft = {
       name: String(formData.get("name") || ""),
       phone: String(formData.get("phone") || ""),
@@ -210,7 +218,7 @@ export default function Home() {
       address: String(formData.get("address") || ""),
       status: editingLead?.status || "New Lead",
       source: String(formData.get("source") || "Other"),
-      potential_value: Number(formData.get("value") || 0),
+      potential_value: jobValue,
       notes: String(formData.get("notes") || "")
     };
 
@@ -586,7 +594,7 @@ export default function Home() {
                   </select>
                 </div>
                 <div className="field full"><label>Property address</label><input name="address" defaultValue={editingLead?.address ?? ""} /></div>
-                <div className="field"><label>Potential job value</label><input name="value" defaultValue={editingLead?.value ?? ""} type="number" min="0" /></div>
+                <div className="field"><label htmlFor="potential-job-value">Potential job value (USD)</label><div style={{display:"flex",alignItems:"center",gap:8}}><span aria-hidden="true">$</span><input id="potential-job-value" name="value" type="text" inputMode="decimal" placeholder="10,000.00" defaultValue={editingLead ? editingLead.value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}) : ""} onBlur={event=>{const raw=event.currentTarget.value.trim().replace(/^\$\s*/,"");if(raw&&/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(raw)){const value=Number(raw.replace(/,/g,""));if(Number.isFinite(value)&&value<=9999999999.99)event.currentTarget.value=value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}}} style={{flex:1,minWidth:0}}/></div></div>
                 <div className="field full"><label>Notes</label><textarea name="notes" defaultValue={editingLead?.notes || ""} /></div>
               </div>
               <div className="actions">
