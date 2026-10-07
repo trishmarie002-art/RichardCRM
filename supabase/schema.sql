@@ -107,3 +107,30 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.leads to authenticated;
 grant select, insert, update, delete on public.roof_measurements to authenticated;
 
+
+-- Saved estimate snapshots preserve the customer details at the time of quoting.
+create table if not exists public.estimates (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  lead_id uuid not null references public.leads(id) on delete cascade,
+  customer jsonb not null,
+  items jsonb not null default '[]'::jsonb check (jsonb_typeof(items) = 'array'),
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists estimates_user_id_idx on public.estimates(user_id);
+create index if not exists estimates_lead_created_idx on public.estimates(lead_id, created_at desc);
+alter table public.estimates enable row level security;
+drop policy if exists estimates_select_own on public.estimates;
+create policy estimates_select_own on public.estimates for select to authenticated
+using ((select auth.uid()) = user_id);
+drop policy if exists estimates_insert_own on public.estimates;
+create policy estimates_insert_own on public.estimates for insert to authenticated
+with check ((select auth.uid()) = user_id and exists (
+  select 1 from public.leads where leads.id = lead_id and leads.user_id = (select auth.uid())
+));
+revoke all on public.estimates from anon, authenticated;
+grant select, insert on public.estimates to authenticated;
+-- Browser roles only need CRM row operations, never TRUNCATE or TRIGGER.
+revoke all on public.leads, public.roof_measurements from anon, authenticated;
+grant select, insert, update, delete on public.leads, public.roof_measurements to authenticated;
