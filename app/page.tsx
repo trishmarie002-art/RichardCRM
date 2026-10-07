@@ -1,5 +1,6 @@
 "use client";
 
+import CustomerWorkspace from "@/components/CustomerWorkspace";
 import EstimateBuilder from "@/components/EstimateBuilder";
 import RoofMap, { type RoofPoint } from "@/components/RoofMap";
 import { useEffect, useMemo, useState } from "react";
@@ -245,11 +246,14 @@ export default function Home() {
   }
 
   async function deleteLead(id: string) {
-    if (syncing || !window.confirm("Delete this customer and their saved roof measurements and estimates?")) return;
+    if (syncing || !window.confirm("Delete this customer and their measurements, estimates and activity history? Uploaded files must be removed first.")) return;
     setSyncing(true);
     try {
       if (cloudMode) {
         if (!supabase || !userId) throw new Error("Sign in first.");
+        const attachments=await supabase.storage.from("customer-files").list(userId+"/"+id,{limit:1});
+        if(attachments.error) throw attachments.error;
+        if(attachments.data?.length) throw new Error("Remove this customer's uploaded files in Customer Workspace before deleting the customer.");
         const {error}=await supabase.from("leads").delete().eq("id",id).select("id").single();
         if (error) throw error;
       } else {
@@ -324,7 +328,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -453,6 +457,7 @@ export default function Home() {
           </div>
         )}
 
+        {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} />}
         {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} />}
         {tab === "Roof Measure" && (
           <>
