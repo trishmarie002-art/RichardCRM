@@ -52,3 +52,9 @@ Saved estimates now have owner-recorded Draft, Sent, Accepted and Declined statu
 ## Personal Daily Schedule
 
 Daily Schedule is a private personal task list with a day picker, optional local time and notes, add/edit/delete, and a clickable completion circle that also reopens a task. It has no customer or job links, and customer deletion does not affect it. Tasks persist in the personal_tasks table with owner-only access; local demo tasks use separate browser storage. Dates and times are wall-clock schedule entries without time-zone conversion. No external reminders are sent. Database setup is supabase/personal-tasks.sql.
+
+## Jobs and material templates
+
+Jobs tracks customer-linked roofing work through Planning, Scheduled, In progress, Completed and Cancelled. Each job has an optional installation date, crew, materials, notes and a five-step checklist. Creating or completing jobs does not change the lead pipeline or an estimate status. Customer deletion cascades to jobs; personal schedule tasks remain separate. Jobs are created manually after confirming the scope.
+
+In Estimates, save valid line items as a named material template and append template items to a new quote. Stored quantities and rates are copied literally, not scaled from roof geometry. Review quantities, units in descriptions, prices and waste before saving. Templates persist separately from customers and saved estimates; deleting a template does not change existing quotes. To change a template, save a new package and delete the old one. Database setup is supabase/jobs-and-templates.sql, applied to the dedicated RichardCRM project.
