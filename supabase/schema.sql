@@ -139,3 +139,13 @@ grant select, insert, update, delete on public.leads, public.roof_measurements t
 alter table public.roof_measurements
 add column if not exists edges jsonb not null default '[]'::jsonb
 check (jsonb_typeof(edges) = 'array');
+
+-- Only status fields can change after an estimate snapshot is saved.
+alter table public.estimates add column if not exists status text not null default 'Draft'
+check (status in ('Draft','Sent','Accepted','Declined'));
+alter table public.estimates add column if not exists status_updated_at timestamptz;
+drop policy if exists estimates_update_status_own on public.estimates;
+create policy estimates_update_status_own on public.estimates for update to authenticated
+using ((select auth.uid()) = user_id)
+with check ((select auth.uid()) = user_id);
+grant update (status, status_updated_at) on public.estimates to authenticated;
