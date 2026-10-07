@@ -1,5 +1,6 @@
 "use client";
 
+import DailySchedule from "@/components/DailySchedule";
 import RoofReport from "@/components/RoofReport";
 import { edgeLength, type RoofEdge } from "@/lib/roof";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
@@ -334,7 +335,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -463,6 +464,7 @@ export default function Home() {
           </div>
         )}
 
+        {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} />}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} />}
         {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} />}
         {tab === "Roof Measure" && (
