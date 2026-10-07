@@ -1,4 +1,5 @@
 "use client";
+import CustomerOverview from "@/components/CustomerOverview";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -12,9 +13,9 @@ const localDateValue = (date: Date) => {
   return date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate())+"T"+pad(date.getHours())+":"+pad(date.getMinutes());
 };
 
-export default function CustomerWorkspace({customers,userId}:{customers:Customer[];userId:string|null}) {
+export default function CustomerWorkspace({customers,userId,initialCustomerId="",onSelect,onOpen}:{customers:Customer[];userId:string|null;initialCustomerId?:string;onSelect?:(id:string)=>void;onOpen?:(tab:string)=>void}) {
   const supabase=useMemo(()=>createClient(),[]);
-  const [customerId,setCustomerId]=useState("");
+  const [customerId,setCustomerId]=useState(initialCustomerId);
   const [entries,setEntries]=useState<Entry[]>([]);
   const [files,setFiles]=useState<Attachment[]>([]);
   const [kind,setKind]=useState<Entry["kind"]>("task");
@@ -129,11 +130,12 @@ export default function CustomerWorkspace({customers,userId}:{customers:Customer
     .sort((a,b)=>view==="History"?b.created_at.localeCompare(a.created_at):(a.due_at||"").localeCompare(b.due_at||""));
   return <div className="grid">
     <div className="card"><h2>Appointments, follow-ups & customer files</h2>
-      <div className="field"><label htmlFor="workspace-customer">Customer / property</label><select id="workspace-customer" disabled={busy} value={customerId} onChange={event=>setCustomerId(event.target.value)}><option value="">Choose a customer</option>{customers.map(item=><option key={item.id} value={item.id}>{item.name} — {item.address}</option>)}</select></div>
+      <div className="field"><label htmlFor="workspace-customer">Customer / property</label><select id="workspace-customer" disabled={busy} value={customerId} onChange={event=>{setCustomerId(event.target.value);onSelect?.(event.target.value);}}><option value="">Choose a customer</option>{customers.map(item=><option key={item.id} value={item.id}>{item.name} — {item.address}</option>)}</select></div>
       {customer && <div style={{marginTop:16}}><p><strong>{customer.name}</strong><br/>{rawPhone || "No phone number saved"}</p>{contactNumber ? <><div className="roofToolbar"><a className="btn" href={"tel:"+contactNumber} aria-label={"Call "+customer.name}>Call customer</a><a className="btn secondary" href={"sms:"+contactNumber} aria-label={"Text "+customer.name}>Text customer</a></div><p className="small muted">Opens your device’s calling or messaging app. Calls and texts are not sent or logged automatically; desktop support depends on your installed apps.</p></> : <p className="muted">Add a valid phone number in Customers to enable Call and Text. Use a 10-digit US number or an international number beginning with +.</p>}</div>}
       {message && <p className="notice" role="status" style={{marginTop:16}}>{message}</p>}
       {loading && <p role="status">Loading customer activity…</p>}
     </div>
+    {customer && onOpen && <CustomerOverview customerId={customer.id} userId={userId} onOpen={onOpen}/>}
     {customer && <><div className="card"><h3>Add to customer history</h3>
       <form action={addEntry} key={customerId+"-"+kind}>
         <div className="formGrid">
