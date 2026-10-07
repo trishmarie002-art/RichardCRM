@@ -134,3 +134,8 @@ grant select, insert on public.estimates to authenticated;
 -- Browser roles only need CRM row operations, never TRUNCATE or TRIGGER.
 revoke all on public.leads, public.roof_measurements from anon, authenticated;
 grant select, insert, update, delete on public.leads, public.roof_measurements to authenticated;
+
+-- Edge classifications, horizontal distances, endpoint rises and optional map points.
+alter table public.roof_measurements
+add column if not exists edges jsonb not null default '[]'::jsonb
+check (jsonb_typeof(edges) = 'array');
