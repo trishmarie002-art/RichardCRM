@@ -48,3 +48,7 @@ Database setup for this workspace is in supabase/customer-workspace.sql and has 
 Roof edges and facet geometry save with the customer measurement and reload on selection. The customer roof report shows the current workspace, facet areas, net roof squares, separate waste quantities, and edge totals by type. Save Measurement before printing to persist that version. Print / Save PDF uses the browser print dialog; satellite imagery is not included in the report. Live Google Maps tracing remains unverified until a restricted Maps key is configured.
 
 Saved estimates now have owner-recorded Draft, Sent, Accepted and Declined statuses with the last status update time. These are bookkeeping labels, not electronic signatures or delivery confirmations; the lead pipeline stays separate. Create revision copies pricing and notes into the builder, then Save estimate creates a new Draft snapshot. The database grants updates only to the two status columns so saved customer details and pricing remain immutable.
+
+## Personal Daily Schedule
+
+Daily Schedule is a private personal task list with a day picker, optional local time and notes, add/edit/delete, and a clickable completion circle that also reopens a task. It has no customer or job links, and customer deletion does not affect it. Tasks persist in the personal_tasks table with owner-only access; local demo tasks use separate browser storage. Dates and times are wall-clock schedule entries without time-zone conversion. No external reminders are sent. Database setup is supabase/personal-tasks.sql.
