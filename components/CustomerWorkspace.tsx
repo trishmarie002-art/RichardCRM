@@ -24,6 +24,10 @@ export default function CustomerWorkspace({customers,userId}:{customers:Customer
   const [view,setView]=useState("Upcoming");
   const prefix=userId+"/"+customerId;
   const customer=customers.find(item=>item.id===customerId);
+  const rawPhone=customer?.phone.trim() || "";
+  const phoneDigits=rawPhone.replace(/[^0-9]/g,"");
+  const plainPhone=/^\+?[0-9\s().-]+$/.test(rawPhone);
+  const contactNumber=plainPhone ? (phoneDigits.length===10 ? "+1"+phoneDigits : phoneDigits.length===11&&phoneDigits.startsWith("1") ? "+"+phoneDigits : rawPhone.startsWith("+")&&/^[1-9]\d{7,14}$/.test(phoneDigits) ? "+"+phoneDigits : null) : null;
 
   useEffect(()=>{
     let active=true;
@@ -126,6 +130,7 @@ export default function CustomerWorkspace({customers,userId}:{customers:Customer
   return <div className="grid">
     <div className="card"><h2>Appointments, follow-ups & customer files</h2>
       <div className="field"><label htmlFor="workspace-customer">Customer / property</label><select id="workspace-customer" disabled={busy} value={customerId} onChange={event=>setCustomerId(event.target.value)}><option value="">Choose a customer</option>{customers.map(item=><option key={item.id} value={item.id}>{item.name} — {item.address}</option>)}</select></div>
+      {customer && <div style={{marginTop:16}}><p><strong>{customer.name}</strong><br/>{rawPhone || "No phone number saved"}</p>{contactNumber ? <><div className="roofToolbar"><a className="btn" href={"tel:"+contactNumber} aria-label={"Call "+customer.name}>Call customer</a><a className="btn secondary" href={"sms:"+contactNumber} aria-label={"Text "+customer.name}>Text customer</a></div><p className="small muted">Opens your device’s calling or messaging app. Calls and texts are not sent or logged automatically; desktop support depends on your installed apps.</p></> : <p className="muted">Add a valid phone number in Customers to enable Call and Text. Use a 10-digit US number or an international number beginning with +.</p>}</div>}
       {message && <p className="notice" role="status" style={{marginTop:16}}>{message}</p>}
       {loading && <p role="status">Loading customer activity…</p>}
     </div>
