@@ -4,9 +4,9 @@ import { createClient } from "@/lib/supabase/client";
 
 type Task = {id:string; title:string; notes:string; task_date:string; task_time:string|null; completed:boolean};
 function today() { const date=new Date(); return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`; }
-export default function DailySchedule({userId,cloudMode}:{userId:string|null;cloudMode:boolean}) {
+export default function DailySchedule({userId,cloudMode,initialDay=""}:{userId:string|null;cloudMode:boolean;initialDay?:string}) {
   const supabase=useMemo(()=>createClient(),[]);
-  const [day,setDay]=useState(today);
+  const [day,setDay]=useState(()=>initialDay||today());
   const [tasks,setTasks]=useState<Task[]>([]);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
