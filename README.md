@@ -28,3 +28,11 @@ Cloud access uses Supabase authentication and ownership policies. Measurements c
 ## Validation
 
 Production build and TypeScript checks can be run with npm run build. Live satellite and cloud integration checks require configured service credentials.
+
+## Customer and estimate workflows
+
+Customers supports search and editing contact information, property addresses, notes, sources and job value. Pipeline updates and deletions only change the visible records after a successful cloud operation. Deletion requests confirmation and removes related measurements and estimates.
+
+Estimates supports priced line items, loading the latest saved roof squares, customer-specific estimate history, and printing / saving as PDF through the browser print dialog. Each saved estimate includes a snapshot of customer details and pricing. It does not send emails, process payments or change pipeline status. Save each revision as a new estimate.
+
+The estimates table added to supabase/schema.sql must be installed before cloud estimate saving is available. The private login screen has no public sign-up button. Provision the owner's login through Supabase Authentication and disable sign-ups there before deployment. Removing a sign-up button alone does not disable the Auth API.
