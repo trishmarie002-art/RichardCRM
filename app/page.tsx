@@ -1,5 +1,6 @@
 "use client";
 
+import Calendar from "@/components/Calendar";
 import Invoices from "@/components/Invoices";
 import Jobs from "@/components/Jobs";
 import DailySchedule from "@/components/DailySchedule";
@@ -99,6 +100,7 @@ export default function Home() {
   const [sections, setSections] = useState<RoofSection[]>([
     { id: 1, name: "Main Roof", footprintSqFt: 1800, pitch: 6 }
   ]);
+  const [calendarDay,setCalendarDay]=useState("");
   const [customerContext,setCustomerContext]=useState("");
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [edges, setEdges] = useState<RoofEdge[]>([]);
@@ -352,7 +354,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices", "Calendar"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -481,9 +483,10 @@ export default function Home() {
           </div>
         )}
 
+        {tab === "Calendar" && <Calendar customers={leads} userId={userId} cloudMode={cloudMode} onOpen={(target,customer,day)=>{if(customer)setCustomerContext(customer);if(day)setCalendarDay(day);setTab(target);}}/>}
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
-        {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} />}
+        {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} initialDay={calendarDay} />}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} initialCustomerId={customerContext} onSelect={setCustomerContext} onOpen={setTab} />}
         {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Roof Measure" && (
