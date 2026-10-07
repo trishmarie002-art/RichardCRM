@@ -7,7 +7,9 @@ type Customer = { id: string; name: string; address: string; email: string; phon
 type Item = { id: string; description: string; quantity: number; rate: number };
 const estimateStatuses = ["Draft", "Sent", "Accepted", "Declined"] as const;
 type EstimateStatus = typeof estimateStatuses[number];
-type Estimate = { status?: EstimateStatus; status_updated_at?: string; id: string; lead_id: string; customer: Customer; items: Item[]; notes: string; created_at: string };
+type Proposal = {company:string;phone:string;email:string;website:string;serviceArea:string;logo:string;warranty:string;exclusions:string;paymentTerms:string};
+const brand = {company:"Star Roofing LLC",phone:"(210) 264-5707",email:"starroofing10@gmail.com",website:"https://starroofingtx.com",serviceArea:"San Antonio, Texas & surrounding areas",logo:"https://starroofingtx.com/wp-content/uploads/2024/09/2021-01-29__1_-removebg-preview.png"};
+type Estimate = { proposal?: Proposal; status?: EstimateStatus; status_updated_at?: string; id: string; lead_id: string; customer: Customer; items: Item[]; notes: string; created_at: string };
 const currency = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 const initialItem = (): Item => ({ id: crypto.randomUUID(), description: "Roof replacement — per square", quantity: 0, rate: 0 });
 
@@ -16,6 +18,9 @@ export default function EstimateBuilder({ customers, userId, cloudMode }: { cust
   const [customerId, setCustomerId] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [notes, setNotes] = useState("");
+  const [warranty,setWarranty]=useState("");
+  const [exclusions,setExclusions]=useState("");
+  const [paymentTerms,setPaymentTerms]=useState("");
   const [history, setHistory] = useState<Estimate[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,7 +30,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode }: { cust
 
   useEffect(() => {
     let active = true;
-    setHistory([]); setItems([]); setNotes(""); setReady(false); setMessage("");
+    setHistory([]); setItems([]); setNotes(""); setWarranty("");setExclusions("");setPaymentTerms(""); setReady(false); setMessage("");
     async function load() {
       try {
         if (!customerId) return;
@@ -70,7 +75,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode }: { cust
       setMessage("Choose a customer and add items with descriptions, positive quantities and nonnegative prices."); return;
     }
     setBusy(true);
-    const record: Estimate = { id: crypto.randomUUID(), lead_id:customer.id, customer:{...customer}, items, notes, status:"Draft", created_at:new Date().toISOString() };
+    const record: Estimate = { id: crypto.randomUUID(), lead_id:customer.id, customer:{...customer}, items, notes, proposal:{...brand,warranty,exclusions,paymentTerms}, status:"Draft", created_at:new Date().toISOString() };
     try {
       if (cloudMode) {
         if (!supabase || !userId) throw new Error("Sign in before saving.");
@@ -104,6 +109,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode }: { cust
   function revise(record: Estimate) {
     setItems(record.items.map(item=>({...item,id:crypto.randomUUID()})));
     setNotes(record.notes);
+    setWarranty(record.proposal?.warranty||"");setExclusions(record.proposal?.exclusions||"");setPaymentTerms(record.proposal?.paymentTerms||"");
     setMessage("Saved estimate copied into the builder. Make your changes and Save estimate to create a new Draft; the original quote stays unchanged.");
   }
 
@@ -112,10 +118,14 @@ export default function EstimateBuilder({ customers, userId, cloudMode }: { cust
     if (!popup) { setMessage("Allow popups to print the estimate."); return; }
     // User content is escaped before being included in the printable document.
     const esc = (value: string) => value.replace(/[&<>"']/g, char => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[char]!));
+    const proposal=record.proposal || {...brand,warranty:"",exclusions:"",paymentTerms:""};
     const amount = record.items.reduce((sum,item)=>sum+Math.round(item.quantity*item.rate*100)/100,0);
-    popup.document.write("<!doctype html><html><head><title>Roofing estimate</title><style>body{font:16px system-ui;margin:48px;color:#172334}h1{border-bottom:3px solid #d98b13;padding-bottom:16px}table{width:100%;border-collapse:collapse;margin:28px 0}td,th{text-align:left;padding:12px 6px;border-bottom:1px solid #ccc}p{white-space:pre-wrap}.total{text-align:right;font-size:24px}</style></head><body><h1>Richard Roof CRM — Estimate</h1><p>"+esc(record.customer.name)+"\n"+esc(record.customer.address)+"\n"+esc(record.customer.phone)+"\n"+esc(record.customer.email)+"</p><p>Date: "+esc(new Date(record.created_at).toLocaleDateString())+"</p><table><thead><tr><th>Description</th><th>Quantity</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>"+record.items.map(item=>"<tr><td>"+esc(item.description)+"</td><td>"+item.quantity+"</td><td>"+currency(item.rate)+"</td><td>"+currency(Math.round(item.quantity*item.rate*100)/100)+"</td></tr>").join("")+"</tbody></table><p class=total>Total: "+currency(amount)+"</p><p>"+esc(record.notes)+"</p><p>Estimate only. Final scope and pricing require confirmation.</p></body></html>");
+    popup.document.write("<!doctype html><html><head><title>Star Roofing proposal</title><style>body{font:16px system-ui;margin:48px;color:#172334}h1{border-bottom:3px solid #b22222;padding-bottom:16px}header{display:flex;gap:24px;align-items:center}header img{max-width:170px;max-height:120px;object-fit:contain}h2{font-size:18px;margin-top:28px}tr{break-inside:avoid}@media print{body{margin:24px}}table{width:100%;border-collapse:collapse;margin:28px 0}td,th{text-align:left;padding:12px 6px;border-bottom:1px solid #ccc}p{white-space:pre-wrap}.total{text-align:right;font-size:24px}</style></head><body><header><img alt=\"Star Roofing logo\" src=\""+esc(proposal.logo)+"\"><div><h1>"+esc(proposal.company)+" — Proposal</h1><p>"+esc(proposal.phone)+"<br>"+esc(proposal.email)+"<br>"+esc(proposal.website)+"<br>"+esc(proposal.serviceArea)+"</p></div></header><h2>Prepared for</h2><p>"+esc(record.customer.name)+"\n"+esc(record.customer.address)+"\n"+esc(record.customer.phone)+"\n"+esc(record.customer.email)+"</p><p>Date: "+esc(new Date(record.created_at).toLocaleDateString())+"</p><table><thead><tr><th>Description</th><th>Quantity</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>"+record.items.map(item=>"<tr><td>"+esc(item.description)+"</td><td>"+item.quantity+"</td><td>"+currency(item.rate)+"</td><td>"+currency(Math.round(item.quantity*item.rate*100)/100)+"</td></tr>").join("")+"</tbody></table><p class=total>Total: "+currency(amount)+"</p><h2>Scope of work</h2><p>"+esc(record.notes||"Scope to be confirmed.")+"</p><h2>Warranty</h2><p>"+esc(proposal.warranty||"Warranty terms have not been specified.")+"</p><h2>Exclusions</h2><p>"+esc(proposal.exclusions||"Exclusions have not been specified.")+"</p><h2>Payment terms</h2><p>"+esc(proposal.paymentTerms||"Payment terms have not been specified.")+"</p><p>Estimate only. Final scope and pricing require confirmation.</p></body></html>");
     popup.document.close();
-    popup.focus(); popup.print();
+    const logo=popup.document.querySelector("img");
+    let printed=false;
+    const finish=()=>{if(printed||popup.closed)return;printed=true;popup.focus();popup.print();};
+    if(logo&&!logo.complete){logo.onload=finish;logo.onerror=()=>{logo.remove();finish();};setTimeout(finish,4000);}else{if(logo&&logo.naturalWidth===0)logo.remove();finish();}
   }
 
   return <div className="card">
@@ -129,7 +139,9 @@ export default function EstimateBuilder({ customers, userId, cloudMode }: { cust
       <div className="field"><label htmlFor={"rate-"+item.id}>Unit price ($)</label><input id={"rate-"+item.id} type="number" min="0" step="0.01" value={item.rate} onChange={event=>setItems(current=>current.map(row=>row.id===item.id?{...row,rate:Number(event.target.value)}:row))}/></div>
       <button className="mini" aria-label={"Remove line item "+(index+1)} onClick={()=>setItems(current=>current.filter(row=>row.id!==item.id))}>Remove</button>
     </div>)}
-    <div className="field" style={{marginTop:16}}><label htmlFor="estimate-notes">Scope, exclusions and payment terms</label><textarea id="estimate-notes" value={notes} onChange={event=>setNotes(event.target.value)}/></div>
+    <div className="field" style={{marginTop:16}}><label htmlFor="estimate-notes">Scope of work</label><textarea id="estimate-notes" value={notes} onChange={event=>setNotes(event.target.value)}/></div>
+    <p className="muted">Proposals use Star Roofing LLC’s website contact details. Enter the terms agreed for this specific job.</p>
+    {[{key:"warranty",label:"Warranty",value:warranty,set:setWarranty},{key:"exclusions",label:"Exclusions",value:exclusions,set:setExclusions},{key:"payment",label:"Payment terms",value:paymentTerms,set:setPaymentTerms}].map(field=><div className="field" key={field.key}><label htmlFor={"proposal-"+field.key}>{field.label}</label><textarea id={"proposal-"+field.key} value={field.value} disabled={busy} onChange={event=>field.set(event.target.value)}/></div>)}
     <div className="kpi"><span>Estimate total</span><strong>{currency(total)}</strong></div>
     <button className="btn" disabled={busy || !ready || !customer || !items.length} onClick={save}>{busy?"Working…":"Save estimate"}</button>
     {message && <p className="notice" role="status" style={{marginTop:16}}>{message}</p>}
