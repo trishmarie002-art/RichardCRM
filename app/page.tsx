@@ -1,5 +1,7 @@
 "use client";
 
+import RoofReport from "@/components/RoofReport";
+import { edgeLength, type RoofEdge } from "@/lib/roof";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
 import EstimateBuilder from "@/components/EstimateBuilder";
 import RoofMap, { type RoofPoint } from "@/components/RoofMap";
@@ -95,6 +97,7 @@ export default function Home() {
     { id: 1, name: "Main Roof", footprintSqFt: 1800, pitch: 6 }
   ]);
   const [selectedLeadId, setSelectedLeadId] = useState("");
+  const [edges, setEdges] = useState<RoofEdge[]>([]);
   const [measurementReady, setMeasurementReady] = useState(false);
   const [waste, setWaste] = useState(10);
   const [userId, setUserId] = useState<string | null>(null);
@@ -150,17 +153,17 @@ export default function Home() {
 
   useEffect(() => {
     let active = true;
-    setMeasurementReady(false); setSections([]); setWaste(10);
+    setMeasurementReady(false); setSections([]); setEdges([]); setWaste(10);
     const load = async () => {
       try {
         if (cloudMode && supabase && userId && selectedLeadId) {
-          const {data, error} = await supabase.from("roof_measurements").select("sections,waste_percent").eq("lead_id",selectedLeadId).order("created_at",{ascending:false}).limit(1).maybeSingle();
+          const {data, error} = await supabase.from("roof_measurements").select("sections,waste_percent,edges").eq("lead_id",selectedLeadId).order("created_at",{ascending:false}).limit(1).maybeSingle();
           if (!active) return;
           if (error) throw error;
-          if (data) { setSections(data.sections); setWaste(Number(data.waste_percent)); }
+          if (data) { setSections(data.sections); setEdges(data.edges || []); setWaste(Number(data.waste_percent)); }
         } else if (!cloudMode && selectedLeadId) {
           const saved = localStorage.getItem("richardcrm.measurements.local." + selectedLeadId);
-          if (saved) { const record=JSON.parse(saved); setSections(record.sections || []); setWaste(record.waste_percent ?? 10); }
+          if (saved) { const record=JSON.parse(saved); setSections(record.sections || []); setEdges(record.edges || []); setWaste(record.waste_percent ?? 10); }
         }
       } catch (error) { if (active) setAuthError(error instanceof Error ? error.message : "Could not load saved measurement."); }
       finally { if (active) setMeasurementReady(true); }
@@ -278,10 +281,13 @@ export default function Home() {
     if (sections.some(section => !Number.isFinite(section.footprintSqFt) || section.footprintSqFt <= 0 || !Number.isFinite(section.pitch) || section.pitch < 0 || section.pitch > 12)) {
       setAuthError("Every roof section needs a positive area and pitch between 0/12 and 12/12."); return;
     }
+    if (edges.some(edge=>!Number.isFinite(edge.horizontalFt) || edge.horizontalFt<=0 || !Number.isFinite(edge.riseFt) || edge.riseFt<0)) {
+      setAuthError("Roof edges need a positive horizontal length and nonnegative height difference."); return;
+    }
     const record = {
       lead_id: lead.id, property_address: lead.address, waste_percent: waste,
       footprint_sqft: sections.reduce((sum, section) => sum + section.footprintSqFt, 0),
-      roof_surface_sqft: roofTotals.raw, roofing_squares: roofTotals.squares, sections
+      roof_surface_sqft: roofTotals.raw, roofing_squares: roofTotals.squares, sections, edges
     };
     setSyncing(true);
     try {
@@ -469,7 +475,7 @@ export default function Home() {
               </select>
             </div>
           </div>
-          <RoofMap key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} />
+          <RoofMap facets={sections} edges={edges} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} />
           <div className="measureLayout">
             <div className="card">
               <div className="sectionTitle">
@@ -538,6 +544,18 @@ export default function Home() {
               </button>
             </div>
           </div>
+          <div className="card" style={{marginTop:16}}>
+            <div className="sectionTitle"><h2>Ridge, hip, valley, eave & rake lengths</h2><button className="btn secondary" disabled={!selectedLeadId || !measurementReady} onClick={()=>setEdges(current=>[...current,{id:crypto.randomUUID(),kind:"eave",horizontalFt:0,riseFt:0}])}>Add manual edge</button></div>
+            <p className="small muted">Trace two endpoints on the satellite map or enter measured horizontal distance. Supply endpoint height difference for sloped lengths.</p>
+            {edges.map(edge=><div className="measureRow" key={edge.id}>
+              <div className="field"><label htmlFor={"edge-kind-"+edge.id}>Edge type</label><select id={"edge-kind-"+edge.id} value={edge.kind} onChange={event=>setEdges(current=>current.map(item=>item.id===edge.id?{...item,kind:event.target.value as RoofEdge["kind"]}:item))}>{["ridge","hip","valley","eave","rake"].map(kind=><option key={kind}>{kind}</option>)}</select></div>
+              <div className="field"><label htmlFor={"edge-horizontal-"+edge.id}>Horizontal ft</label><input id={"edge-horizontal-"+edge.id} type="number" min="0" step="0.1" value={edge.horizontalFt} onChange={event=>setEdges(current=>current.map(item=>item.id===edge.id?{...item,horizontalFt:Number(event.target.value),points:undefined}:item))}/></div>
+              <div className="field"><label htmlFor={"edge-height-"+edge.id}>Height difference ft</label><input id={"edge-height-"+edge.id} type="number" min="0" step="0.1" value={edge.riseFt} onChange={event=>setEdges(current=>current.map(item=>item.id===edge.id?{...item,riseFt:Number(event.target.value)}:item))}/></div>
+              <div><strong>{edgeLength(edge).toFixed(1)} ft</strong><br/><button className="mini" onClick={()=>setEdges(current=>current.filter(item=>item.id!==edge.id))}>Remove</button></div>
+            </div>)}
+            {!edges.length && <p className="muted">No roof edges measured yet.</p>}
+          </div>
+          <RoofReport customer={leads.find(lead=>lead.id===selectedLeadId)} sections={sections} edges={edges} waste={waste}/>
           </>
         )}
       </main>
