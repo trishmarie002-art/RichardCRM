@@ -36,3 +36,11 @@ Customers supports search and editing contact information, property addresses, n
 Estimates supports priced line items, loading the latest saved roof squares, customer-specific estimate history, and printing / saving as PDF through the browser print dialog. Each saved estimate includes a snapshot of customer details and pricing. It does not send emails, process payments or change pipeline status. Save each revision as a new estimate.
 
 The estimates table added to supabase/schema.sql must be installed before cloud estimate saving is available. The private login screen has no public sign-up button. Provision the owner's login through Supabase Authentication and disable sign-ups there before deployment. Removing a sign-up button alone does not disable the Auth API.
+
+## Customer workspace
+
+Customer Workspace attaches inspection appointments, follow-up tasks, and activity notes to a chosen lead. Upcoming tasks can be marked complete or reopened, and appointment records can be downloaded as one-hour calendar events (.ics). Dates use the device time zone on input, are stored in UTC, and display in the viewing device time zone. Reminders are visible inside the CRM; no email, SMS, push notification or external calendar synchronization is implemented.
+
+The private customer-files bucket accepts JPG, PNG, WebP and PDF up to 10 MB. Each file is stored under owner UUID / lead UUID / unique filename. Viewing generates a URL valid for 60 seconds. The workspace shows the latest 100 files. Remove uploaded files before deleting their customer.
+
+Database setup for this workspace is in supabase/customer-workspace.sql and has been applied to RichardCRM. Cloud end-to-end testing still requires a confirmed owner login.
