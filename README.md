@@ -9,7 +9,7 @@ npm run dev
 
 ## Connections
 
-Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY for a dedicated RichardCRM project. Run supabase/schema.sql there. Without these settings the app uses browser-local demo data; this is not a private cloud deployment.
+Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY for a dedicated RichardCRM project. Run supabase/schema.sql there. The app includes the dedicated project’s public connection settings in lib/supabase/project.json; environment variables override them. Only public URL and publishable key belong in browser code.
 
 For satellite tracing set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY. Enable Maps JavaScript API and Geocoding API, activate Google billing, and restrict the browser key to your website domains and those APIs. Do not commit credentials. The key is intentionally public in the browser and must have website restrictions.
 
@@ -19,7 +19,7 @@ Choose a customer in Roof Measure. Find the property address, confirm the correc
 
 Roof surface uses footprint × sqrt(1 + (pitch/12)^2). Waste increases material quantities only. Squares shown include waste; bundles assume three per square and must be checked against the chosen product.
 
-Satellite-derived results are estimates, not certified measurement reports. Pitch is entered manually. Ridge/hip/valley/eave/rake classifications and slope-corrected linear measurements are not implemented yet. Facets do not automatically detect overlap or roof geometry. Field verification is required before ordering materials.
+Satellite-derived results are estimates, not certified measurement reports. Pitch is entered manually. Ridge, hip, valley, eave and rake edges can be traced between two map endpoints or entered manually. Edge length uses sqrt(horizontal distance² + endpoint height difference²), assuming a straight edge; pitch alone does not determine hip or valley length. A zero height difference reports horizontal length. Avoid counting shared edges twice. Facets do not automatically detect overlap or roof geometry. Field verification is required before ordering materials.
 
 ## Privacy
 
@@ -44,3 +44,5 @@ Customer Workspace attaches inspection appointments, follow-up tasks, and activi
 The private customer-files bucket accepts JPG, PNG, WebP and PDF up to 10 MB. Each file is stored under owner UUID / lead UUID / unique filename. Viewing generates a URL valid for 60 seconds. The workspace shows the latest 100 files. Remove uploaded files before deleting their customer.
 
 Database setup for this workspace is in supabase/customer-workspace.sql and has been applied to RichardCRM. Cloud end-to-end testing still requires a confirmed owner login.
+
+Roof edges and facet geometry save with the customer measurement and reload on selection. The customer roof report shows the current workspace, facet areas, net roof squares, separate waste quantities, and edge totals by type. Save Measurement before printing to persist that version. Print / Save PDF uses the browser print dialog; satellite imagery is not included in the report. Live Google Maps tracing remains unverified until a restricted Maps key is configured.
