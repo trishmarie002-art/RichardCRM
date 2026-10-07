@@ -1,5 +1,6 @@
 "use client";
 
+import Invoices from "@/components/Invoices";
 import Jobs from "@/components/Jobs";
 import DailySchedule from "@/components/DailySchedule";
 import RoofReport from "@/components/RoofReport";
@@ -262,6 +263,9 @@ export default function Home() {
         const {error}=await supabase.from("leads").delete().eq("id",id).select("id").single();
         if (error) throw error;
       } else {
+        const allJobs = JSON.parse(localStorage.getItem("richardcrm.jobs.v1") || "[]");
+        const allInvoices = JSON.parse(localStorage.getItem("richardcrm.invoices.v1") || "[]");
+        if(allInvoices.some((invoice: {job_id:string})=>allJobs.some((job:{id:string;lead_id:string})=>job.id===invoice.job_id&&job.lead_id===id))) throw new Error("This customer has invoices. Keep the customer and job to preserve payment records.");
         localStorage.removeItem("richardcrm.measurements.local."+id);
         localStorage.removeItem("richardcrm.estimates.v1."+id);
         const jobs = JSON.parse(localStorage.getItem("richardcrm.jobs.v1") || "[]");
@@ -338,7 +342,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -467,6 +471,7 @@ export default function Home() {
           </div>
         )}
 
+        {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} />}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} />}
