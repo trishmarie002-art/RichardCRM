@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardOverview from "@/components/DashboardOverview";
 import Calendar from "@/components/Calendar";
 import Invoices from "@/components/Invoices";
 import Jobs from "@/components/Jobs";
@@ -178,7 +179,7 @@ export default function Home() {
     return () => { active = false; };
   }, [selectedLeadId, userId, cloudMode, supabase]);
 
-  const openPipeline = leads.filter((l) => l.status !== "Won").reduce((sum, l) => sum + l.value, 0);
+  const openPipeline = leads.filter((l) => l.status !== "Won" && l.status !== "Lost").reduce((sum, l) => sum + l.value, 0);
   const wonRevenue = leads.filter((l) => l.status === "Won").reduce((sum, l) => sum + l.value, 0);
   const inspectionCount = leads.filter((l) => l.status === "Inspection").length;
 
@@ -397,12 +398,13 @@ export default function Home() {
                 <div className="statFoot">Potential revenue still in progress</div>
               </div>
               <div className="card">
-                <div className="statTitle">Won Revenue</div>
+                <div className="statTitle">Won Lead Value</div>
                 <div className="statValue">{money(wonRevenue)}</div>
-                <div className="statFoot">Closed roofing jobs</div>
+                <div className="statFoot">Potential value of won leads; payments shown below</div>
               </div>
             </div>
 
+            <DashboardOverview customers={leads} userId={userId} cloudMode={cloudMode} onOpen={(target,customer,day)=>{setCustomerContext(customer||"");if(day)setCalendarDay(day);setTab(target);}}/>
             <div className="card" style={{ marginTop: 18 }}>
               <div className="sectionTitle">
                 <h2>Recent Leads</h2>
