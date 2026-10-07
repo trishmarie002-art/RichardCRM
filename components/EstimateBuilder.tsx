@@ -1,4 +1,5 @@
 "use client";
+import MaterialTemplates from "@/components/MaterialTemplates";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -121,6 +122,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode }: { cust
     <h2>Roofing estimate builder</h2>
     <div className="field"><label htmlFor="estimate-customer">Customer / property</label><select id="estimate-customer" disabled={busy} value={customerId} onChange={event=>setCustomerId(event.target.value)}><option value="">Choose a customer</option>{customers.map(item=><option key={item.id} value={item.id}>{item.name} — {item.address}</option>)}</select></div>
     <div className="roofToolbar"><button className="btn secondary" disabled={!customer || !ready || busy} onClick={()=>setItems(current=>[...current,initialItem()])}>Add line item</button><button className="btn secondary" disabled={!customer || !ready || busy} onClick={useMeasurement}>Use saved roof squares</button></div>
+    <MaterialTemplates userId={userId} cloudMode={cloudMode} items={items} disabled={busy || !ready || !customer} onApply={added=>setItems(current=>[...current,...added])}/>
     {items.map((item,index)=><div className="measureRow" key={item.id}>
       <div className="field"><label htmlFor={"desc-"+item.id}>Description</label><input id={"desc-"+item.id} value={item.description} onChange={event=>setItems(current=>current.map(row=>row.id===item.id?{...row,description:event.target.value}:row))}/></div>
       <div className="field"><label htmlFor={"qty-"+item.id}>Quantity</label><input id={"qty-"+item.id} type="number" min="0" step="0.01" value={item.quantity} onChange={event=>setItems(current=>current.map(row=>row.id===item.id?{...row,quantity:Number(event.target.value)}:row))}/></div>
