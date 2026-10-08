@@ -1,0 +1,8 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {parseCensusResult,reusableLocation,addressKey} from '../lib/geocoding.ts';
+test('Census x/y become longitude/latitude and match label is retained',()=>assert.deepEqual(parseCensusResult({result:{addressMatches:[{matchedAddress:'123 MAIN ST',coordinates:{x:-98.5,y:29.4}}]}}),{lat:29.4,lng:-98.5,matched_address:'123 MAIN ST',status:'matched'}));
+test('empty and ambiguous matches do not create invented pins',()=>{assert.equal(parseCensusResult({result:{addressMatches:[]}}).status,'not_found');assert.equal(parseCensusResult({result:{addressMatches:[{},{}]}}).status,'ambiguous');});
+test('malformed provider responses and invalid coordinates are rejected',()=>{assert.throws(()=>parseCensusResult({}));assert.throws(()=>parseCensusResult({result:{addressMatches:[{coordinates:{x:-98,y:999}}]}}));assert.throws(()=>parseCensusResult({result:{addressMatches:[{coordinates:{x:'-98',y:29}}]}}));});
+test('changed addresses invalidate old pins; harmless case/whitespace changes do not',()=>{const pin={source_address:'123 Main St, TX',status:'matched',checked_at:'2026-01-01'};assert.equal(reusableLocation(pin,'124 Main St, TX'),false);assert.equal(reusableLocation(pin,' 123  MAIN ST, TX '),true);assert.equal(addressKey(' A  B '),'a b');});
+test('negative results expire after a day',()=>{const pin={source_address:'A',status:'not_found',checked_at:'2026-01-01T00:00:00Z'};assert.equal(reusableLocation(pin,'A',Date.parse('2026-01-01T12:00:00Z')),true);assert.equal(reusableLocation(pin,'A',Date.parse('2026-01-02T00:00:01Z')),false);});

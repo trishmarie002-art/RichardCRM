@@ -1,5 +1,6 @@
 "use client";
 
+import CustomerMap from "@/components/CustomerMap";
 import BusinessTools from "@/components/BusinessTools";
 import FollowUps from "@/components/FollowUps";
 import MessageTemplates from "@/components/MessageTemplates";
@@ -490,7 +491,8 @@ export default function Home() {
           </div>
         )}
 
-        {["Inspections","Profit Calculator","Estimate Options","Warranties","Customer Map"].includes(tab) && <BusinessTools key={tab} mode={tab} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} onOpen={(target,id,option)=>{if(id)setCustomerContext(id);setEstimateOption(option||null);setTab(target);}}/>}
+        {["Inspections","Profit Calculator","Estimate Options","Warranties"].includes(tab) && <BusinessTools key={tab} mode={tab} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} onOpen={(target,id,option)=>{if(id)setCustomerContext(id);setEstimateOption(option||null);setTab(target);}}/>}
+        {tab === "Customer Map" && <CustomerMap customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);setTab(target);}}/>}
         {tab === "Follow-ups" && <FollowUps customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);setTab(target);}}/>}
         {tab === "Message Templates" && <MessageTemplates customers={leads} userId={userId} initialCustomerId={customerContext}/>}
         {tab === "Lead Files" && <LeadFiles leads={leads} userId={userId} initialLeadId={customerContext} onSelect={setCustomerContext}/>}
