@@ -331,7 +331,7 @@ export default function Home() {
     return (
       <div className="app" style={{ display: "grid", placeItems: "center", gridTemplateColumns: "1fr", padding: 20 }}>
         <div className="card" style={{ width: "min(480px, 100%)" }}>
-          <div className="logo" style={{ marginBottom: 8 }}>Richard <span>Roof CRM</span></div>
+          <div className="logo" style={{ marginBottom: 8 }}>Star Roofing <span>CRM</span></div>
           <p className="muted">Private sign-in for your roofing leads and measurements.</p>
 
           <form action={signIn}>
@@ -352,7 +352,7 @@ export default function Home() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="logo">Richard <span>Roof CRM</span></div>
+        <div className="logo">Star Roofing <span>CRM</span></div>
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
