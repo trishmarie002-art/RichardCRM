@@ -1,5 +1,8 @@
 "use client";
 
+import BusinessTools from "@/components/BusinessTools";
+import FollowUps from "@/components/FollowUps";
+import MessageTemplates from "@/components/MessageTemplates";
 import LeadFiles from "@/components/LeadFiles";
 import DashboardOverview from "@/components/DashboardOverview";
 import Calendar from "@/components/Calendar";
@@ -104,6 +107,7 @@ export default function Home() {
   ]);
   const [calendarDay,setCalendarDay]=useState("");
   const [customerContext,setCustomerContext]=useState("");
+  const [estimateOption,setEstimateOption]=useState<{name:string;scope:string;price:number}|null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [edges, setEdges] = useState<RoofEdge[]>([]);
   const [measurementReady, setMeasurementReady] = useState(false);
@@ -356,7 +360,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices", "Calendar", "Lead Files"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices", "Calendar", "Lead Files", "Inspections", "Profit Calculator", "Follow-ups", "Estimate Options", "Warranties", "Message Templates", "Customer Map"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -486,13 +490,16 @@ export default function Home() {
           </div>
         )}
 
+        {["Inspections","Profit Calculator","Estimate Options","Warranties","Customer Map"].includes(tab) && <BusinessTools key={tab} mode={tab} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} onOpen={(target,id,option)=>{if(id)setCustomerContext(id);setEstimateOption(option||null);setTab(target);}}/>}
+        {tab === "Follow-ups" && <FollowUps customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);setTab(target);}}/>}
+        {tab === "Message Templates" && <MessageTemplates customers={leads} userId={userId} initialCustomerId={customerContext}/>}
         {tab === "Lead Files" && <LeadFiles leads={leads} userId={userId} initialLeadId={customerContext} onSelect={setCustomerContext}/>}
         {tab === "Calendar" && <Calendar customers={leads} userId={userId} cloudMode={cloudMode} onOpen={(target,customer,day)=>{if(customer)setCustomerContext(customer);if(day)setCalendarDay(day);setTab(target);}}/>}
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} initialDay={calendarDay} />}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} initialCustomerId={customerContext} onSelect={setCustomerContext} onOpen={setTab} />}
-        {tab === "Estimates" && <EstimateBuilder customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
+        {tab === "Estimates" && <EstimateBuilder initialOption={estimateOption} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Roof Measure" && (
           <>
           <div className="card" style={{marginBottom:16}}>

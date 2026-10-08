@@ -53,3 +53,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:760px){.roofMap{height:360px}}
 
 .activityItem{padding:16px 0;border-bottom:1px solid var(--line)}
+
+.toolPackages{grid-template-columns:repeat(3,minmax(0,1fr));margin:16px 0}.field select[multiple]{min-height:100px}@media(max-width:900px){.toolPackages{grid-template-columns:1fr}}
+
+.jobProgressBoard{display:grid;grid-template-columns:repeat(7,220px);gap:12px;overflow:auto;margin:20px 0}.jobProgressBoard .pipeCol{min-height:180px}.jobProgressBoard select{width:100%;background:#08131f;color:white;padding:8px;border:1px solid var(--line);border-radius:8px}

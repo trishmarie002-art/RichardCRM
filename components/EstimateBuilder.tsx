@@ -13,7 +13,7 @@ type Estimate = { proposal?: Proposal; status?: EstimateStatus; status_updated_a
 const currency = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 const initialItem = (): Item => ({ id: crypto.randomUUID(), description: "Roof replacement — per square", quantity: 0, rate: 0 });
 
-export default function EstimateBuilder({ customers, userId, cloudMode, initialCustomerId="" }: { customers: Customer[]; userId: string | null; cloudMode: boolean; initialCustomerId?:string }) {
+export default function EstimateBuilder({ customers, userId, cloudMode, initialCustomerId="", initialOption=null }: { customers: Customer[]; userId: string | null; cloudMode: boolean; initialCustomerId?:string; initialOption?:{name:string;scope:string;price:number}|null }) {
   const supabase = useMemo(() => createClient(), []);
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [items, setItems] = useState<Item[]>([]);
@@ -44,11 +44,11 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
           if (active && stored) setHistory(JSON.parse(stored));
         }
       } catch (error) { if (active) setMessage(error instanceof Error ? error.message : "Could not load estimates."); }
-      finally { if (active) setReady(true); }
+      finally { if (active) {if(initialOption&&customerId===initialCustomerId){setItems([{id:crypto.randomUUID(),description:initialOption.name,quantity:1,rate:initialOption.price}]);setNotes(initialOption.scope);}setReady(true);} }
     }
     void load();
     return () => { active = false; };
-  }, [customerId, cloudMode, supabase, userId]);
+  }, [customerId, cloudMode, supabase, userId, initialOption, initialCustomerId]);
 
   async function useMeasurement() {
     if (!customer) return;
