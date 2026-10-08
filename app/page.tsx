@@ -1,5 +1,6 @@
 "use client";
 
+import LeadFiles from "@/components/LeadFiles";
 import DashboardOverview from "@/components/DashboardOverview";
 import Calendar from "@/components/Calendar";
 import Invoices from "@/components/Invoices";
@@ -355,7 +356,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices", "Calendar"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices", "Calendar", "Lead Files"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
               {item}
             </button>
@@ -485,6 +486,7 @@ export default function Home() {
           </div>
         )}
 
+        {tab === "Lead Files" && <LeadFiles leads={leads} userId={userId} initialLeadId={customerContext} onSelect={setCustomerContext}/>}
         {tab === "Calendar" && <Calendar customers={leads} userId={userId} cloudMode={cloudMode} onOpen={(target,customer,day)=>{if(customer)setCustomerContext(customer);if(day)setCalendarDay(day);setTab(target);}}/>}
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
