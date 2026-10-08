@@ -41,7 +41,7 @@ The estimates table added to supabase/schema.sql must be installed before cloud 
 
 Customer Workspace attaches inspection appointments, follow-up tasks, and activity notes to a chosen lead. Upcoming tasks can be marked complete or reopened, and appointment records can be downloaded as one-hour calendar events (.ics). Dates use the device time zone on input, are stored in UTC, and display in the viewing device time zone. Reminders are visible inside the CRM; no email, SMS, push notification or external calendar synchronization is implemented.
 
-The private customer-files bucket accepts JPG, PNG, WebP and PDF up to 10 MB. Each file is stored under owner UUID / lead UUID / unique filename. Viewing generates a URL valid for 60 seconds. The workspace shows the latest 100 files. Remove uploaded files before deleting their customer.
+The private customer-files bucket accepts JPG, PNG, WebP, PDF, MP4, MOV, WebM and M4V up to 50 MB per file. Customer Workspace retains its 10 MB photo/PDF picker; Lead Files provides the full media upload workflow. Each file is stored under owner UUID / lead UUID / unique filename. Viewing generates a URL valid for 60 seconds. The workspace shows the latest 100 files. Remove uploaded files before deleting their customer.
 
 Database setup for this workspace is in supabase/customer-workspace.sql and has been applied to RichardCRM. Cloud end-to-end testing still requires a confirmed owner login.
 
@@ -66,3 +66,7 @@ New estimates snapshot Star Roofing LLC contact details from starroofingtx.com: 
 ## Invoices and payments
 
 Invoices supports one invoice per job, owner-unique invoice numbers, total, requested deposit, optional due date and notes. Record each actual receipt as Payment or Deposit with date, method and reference. Deposits are included once in all payments received; requested deposits never count as receipts. Integer cents avoid rounding drift. Balance is total minus receipts, with excess receipts displayed as an overpayment. This is manual bookkeeping, not payment processing, refunds or a tax/accounting system. Corrections remove an incorrect payment entry after confirmation; this is not a permanent audit trail. Invoices cannot be deleted in the UI, and database foreign keys protect invoiced jobs/customers from deletion. Invoice printing uses current customer/job details and Star Roofing contact details. Database setup is supabase/invoices-and-payments.sql.
+
+## Lead Files
+
+Choose a lead in Lead Files to upload multiple roof photos, inspection videos and PDFs. Files use the same private customer-files bucket and owner/lead folders as Customer Workspace, so existing uploads appear without duplication. View photos and browser-supported video formats, open PDFs, download and confirm deletion. Filter the loaded list by Photos, Videos or Documents; Load more retrieves another 50 files. Uploads are sequential with batch status and individual errors; interrupted uploads must be retried and are not resumable. Max 50 MB per file, subject to the project global storage limit. Video playback depends on codec support. View links expire after one hour and download links after 60 seconds. Storage configuration and the explicitly qualified owner/lead policies are in supabase/lead-media.sql. Actual authenticated browser upload/playback still requires verification.
