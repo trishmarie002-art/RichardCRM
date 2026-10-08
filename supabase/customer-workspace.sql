@@ -26,17 +26,17 @@ revoke all on public.customer_activity from anon,authenticated;
 grant select,insert,update on public.customer_activity to authenticated;
 
 insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
-values ('customer-files','customer-files',false,10485760,array['image/jpeg','image/png','image/webp','application/pdf'])
+values ('customer-files','customer-files',false,52428800,array['image/jpeg','image/png','image/webp','application/pdf','video/mp4','video/quicktime','video/webm','video/x-m4v'])
 on conflict (id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types;
 create policy customer_files_select on storage.objects for select to authenticated using (
- bucket_id='customer-files' and (storage.foldername(name))[1]=(select auth.uid())::text
- and exists(select 1 from public.leads where leads.id::text=(storage.foldername(name))[2] and leads.user_id=(select auth.uid()))
+ bucket_id='customer-files' and (storage.foldername(objects.name))[1]=(select auth.uid())::text
+ and exists(select 1 from public.leads where leads.id::text=(storage.foldername(objects.name))[2] and leads.user_id=(select auth.uid()))
 );
 create policy customer_files_insert on storage.objects for insert to authenticated with check (
- bucket_id='customer-files' and (storage.foldername(name))[1]=(select auth.uid())::text
- and exists(select 1 from public.leads where leads.id::text=(storage.foldername(name))[2] and leads.user_id=(select auth.uid()))
+ bucket_id='customer-files' and (storage.foldername(objects.name))[1]=(select auth.uid())::text
+ and exists(select 1 from public.leads where leads.id::text=(storage.foldername(objects.name))[2] and leads.user_id=(select auth.uid()))
 );
 create policy customer_files_delete on storage.objects for delete to authenticated using (
- bucket_id='customer-files' and (storage.foldername(name))[1]=(select auth.uid())::text
- and exists(select 1 from public.leads where leads.id::text=(storage.foldername(name))[2] and leads.user_id=(select auth.uid()))
+ bucket_id='customer-files' and (storage.foldername(objects.name))[1]=(select auth.uid())::text
+ and exists(select 1 from public.leads where leads.id::text=(storage.foldername(objects.name))[2] and leads.user_id=(select auth.uid()))
 );
