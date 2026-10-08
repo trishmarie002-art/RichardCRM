@@ -512,7 +512,7 @@ export default function Home() {
               </select>
             </div>
           </div>
-          <RoofMap facets={sections} edges={edges} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} />
+          {selectedLeadId && measurementReady ? <RoofMap facets={sections} edges={edges} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
           <div className="measureLayout">
             <div className="card">
               <div className="sectionTitle">
