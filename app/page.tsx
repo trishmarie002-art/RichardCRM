@@ -117,6 +117,8 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(!cloudMode);
   const [authError, setAuthError] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [requestReset, setRequestReset] = useState(false);
 
   useEffect(() => {
     if (!cloudMode) {
@@ -132,14 +134,24 @@ export default function Home() {
 
     if (!supabase) return;
 
+    const params = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.slice(1));
+    if (params.get("reset") === "1" || hash.get("type") === "recovery") setRecovering(true);
+    if (hash.has("error") || params.has("error")) {
+      setAuthError("This recovery link is invalid or expired. Request a new reset email and use the newest link.");
+      setRequestReset(true);
+      setRecovering(false);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
     let active = true;
     supabase.auth.getUser().then(({ data, error }) => {
       if (!active) return;
       setUserId(data.user?.id ?? null);
-      if (error) setAuthError(error.message);
+      if (error && error.name !== "AuthSessionMissingError") setAuthError(error.message);
       setAuthReady(true);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") setRecovering(true);
       setUserId(session?.user?.id ?? null);
       setAuthReady(true);
       if (!session?.user) { setLeads([]); setSelectedLeadId(""); }
@@ -206,6 +218,37 @@ export default function Home() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setAuthError(error.message);
     setSyncing(false);
+  }
+
+  async function sendReset(formData: FormData) {
+    if (!supabase) return;
+    setSyncing(true); setAuthError("");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(String(formData.get("email") || "").trim(), {
+        redirectTo: window.location.origin + "/?reset=1"
+      });
+      if (error) throw error;
+      setAuthError("If this email has a CRM account, a reset link has been requested. Check your inbox and spam folder. Open the newest link in this same browser.");
+    } catch (error) { setAuthError(error instanceof Error ? error.message : "Could not request a reset email."); }
+    finally { setSyncing(false); }
+  }
+
+  async function updatePassword(formData: FormData) {
+    if (!supabase || !userId) return;
+    const password = String(formData.get("password") || "");
+    if (password.length < 8) { setAuthError("Use at least 8 characters."); return; }
+    if (password !== String(formData.get("confirmPassword") || "")) { setAuthError("The passwords do not match."); return; }
+    setSyncing(true); setAuthError("");
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      const { error: signOutError } = await supabase.auth.signOut();
+      if (signOutError) throw signOutError;
+      setRecovering(false); setRequestReset(false);
+      window.history.replaceState(null, "", window.location.pathname);
+      setAuthError("Password updated. Sign in with your new password.");
+    } catch (error) { setAuthError(error instanceof Error ? error.message : "Could not update your password."); }
+    finally { setSyncing(false); }
   }
 
   async function signOut() {
@@ -332,23 +375,39 @@ export default function Home() {
     return <div className="empty">Loading secure CRM…</div>;
   }
 
-  if (cloudMode && !userId) {
+  if (cloudMode && (!userId || recovering || requestReset)) {
     return (
       <div className="app" style={{ display: "grid", placeItems: "center", gridTemplateColumns: "1fr", padding: 20 }}>
         <div className="card" style={{ width: "min(480px, 100%)" }}>
           <div className="logo" style={{ marginBottom: 8 }}>Star Roofing <span>CRM</span></div>
-          <p className="muted">Private sign-in for your roofing leads and measurements.</p>
-
-          <form action={signIn}>
-            <div className="field"><label>Email</label><input name="email" type="email" required /></div>
-            <div className="field" style={{ marginTop: 12 }}><label>Password</label><input name="password" type="password" minLength={6} required /></div>
-            <div className="actions">
-
-              <button className="btn" disabled={syncing}>{syncing ? "Working…" : "Sign In"}</button>
-            </div>
-          </form>
-
-          {authError && <div className="notice" style={{ marginTop: 14 }}>{authError}</div>}
+          <h1 style={{fontSize:24}}>{recovering ? "Choose a new password" : requestReset ? "Reset your password" : "Sign in"}</h1>
+          {recovering && userId ? (
+            <form action={updatePassword}>
+              <div className="field"><label htmlFor="new-password">New password</label><input id="new-password" name="password" type="password" autoComplete="new-password" minLength={8} required /></div>
+              <div className="field" style={{marginTop:12}}><label htmlFor="confirm-password">Confirm new password</label><input id="confirm-password" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} required /></div>
+              <div className="actions"><button className="btn" disabled={syncing}>{syncing ? "Saving…" : "Save New Password"}</button></div>
+            </form>
+          ) : recovering ? (
+            <p className="notice">No valid recovery session was found. Request a new reset email and open the newest link in the browser where you requested it.</p>
+          ) : requestReset ? (
+            <form action={sendReset}>
+              <p className="muted">Enter the email you use to sign into this CRM.</p>
+              <div className="field"><label htmlFor="reset-email">Email</label><input id="reset-email" name="email" type="email" autoComplete="email" required /></div>
+              <div className="actions"><button className="btn" disabled={syncing}>{syncing ? "Sending…" : "Send Reset Email"}</button></div>
+            </form>
+          ) : (
+            <form action={signIn}>
+              <p className="muted">Private sign-in for your roofing leads and measurements.</p>
+              <div className="field"><label htmlFor="signin-email">Email</label><input id="signin-email" name="email" type="email" autoComplete="username" required /></div>
+              <div className="field" style={{ marginTop: 12 }}><label htmlFor="signin-password">Password</label><input id="signin-password" name="password" type="password" autoComplete="current-password" minLength={6} required /></div>
+              <div className="actions"><button className="btn" disabled={syncing}>{syncing ? "Working…" : "Sign In"}</button></div>
+            </form>
+          )}
+          <div className="actions">
+            {(recovering || requestReset) && <button className="mini" disabled={syncing} onClick={() => { setRecovering(false); setRequestReset(false); setAuthError(""); window.history.replaceState(null,"",window.location.pathname); }}>Back to Sign In</button>}
+            {!requestReset && (!recovering || !userId) && <button className="mini" disabled={syncing} onClick={() => {setRecovering(false);setRequestReset(true);setAuthError("");}}>Forgot password?</button>}
+          </div>
+          {authError && <div className="notice" role="status" style={{ marginTop: 14 }}>{authError}</div>}
         </div>
       </div>
     );
