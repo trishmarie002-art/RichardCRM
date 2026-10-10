@@ -3,7 +3,7 @@ import CustomerOverview from "@/components/CustomerOverview";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-type Customer = { id:string; name:string; address:string; phone:string };
+type Customer = { user_id?:string; id:string; name:string; address:string; phone:string };
 type Entry = { id:string; lead_id:string; kind:"appointment"|"task"|"note"; title:string; details:string; due_at:string|null; completed:boolean; created_at:string };
 type Attachment = { name:string; id?:string|null; created_at?:string|null };
 const bucket = "customer-files";
@@ -23,8 +23,8 @@ export default function CustomerWorkspace({customers,userId,initialCustomerId=""
   const [busy,setBusy]=useState(false);
   const [loading,setLoading]=useState(false);
   const [view,setView]=useState("Upcoming");
-  const prefix=userId+"/"+customerId;
   const customer=customers.find(item=>item.id===customerId);
+  const prefix=(customer?.user_id||userId)+"/"+customerId;
   const rawPhone=customer?.phone.trim() || "";
   const phoneDigits=rawPhone.replace(/[^0-9]/g,"");
   const plainPhone=/^\+?[0-9\s().-]+$/.test(rawPhone);
@@ -37,7 +37,7 @@ export default function CustomerWorkspace({customers,userId,initialCustomerId=""
     setLoading(true);
     Promise.all([
       supabase.from("customer_activity").select("*").eq("lead_id",customerId).order("created_at",{ascending:false}),
-      supabase.storage.from(bucket).list(userId+"/"+customerId,{limit:100,sortBy:{column:"created_at",order:"desc"}})
+      supabase.storage.from(bucket).list(prefix,{limit:100,sortBy:{column:"created_at",order:"desc"}})
     ]).then(([activity,attachments])=>{
       if(!active)return;
       if(activity.error || attachments.error) throw activity.error || attachments.error;
@@ -45,7 +45,7 @@ export default function CustomerWorkspace({customers,userId,initialCustomerId=""
     }).catch(error=>{if(active)setMessage(error.message || "Unable to load customer workspace.");})
       .finally(()=>{if(active)setLoading(false);});
     return()=>{active=false;};
-  },[customerId,userId,supabase]);
+  },[customerId,userId,supabase,prefix]);
 
   async function addEntry(form:FormData) {
     if(!supabase || !userId || !customer)return;

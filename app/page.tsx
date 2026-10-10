@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Lead = {
+  user_id?: string;
   id: string;
   name: string;
   phone: string;
@@ -82,6 +83,7 @@ const money = (n: number) =>
 function mapDbLead(row: any): Lead {
   return {
     id: String(row.id),
+    user_id: row.user_id,
     name: row.name ?? "",
     phone: row.phone ?? "",
     email: row.email ?? "",
@@ -318,7 +320,7 @@ export default function Home() {
     try {
       if (cloudMode) {
         if (!supabase || !userId) throw new Error("Sign in first.");
-        const attachments=await supabase.storage.from("customer-files").list(userId+"/"+id,{limit:1});
+        const attachments=await supabase.storage.from("customer-files").list((leads.find(lead=>lead.id===id)?.user_id||userId)+"/"+id,{limit:1});
         if(attachments.error) throw attachments.error;
         if(attachments.data?.length) throw new Error("Remove this customer's uploaded files in Customer Workspace before deleting the customer.");
         const {error}=await supabase.from("leads").delete().eq("id",id).select("id").single();

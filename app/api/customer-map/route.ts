@@ -14,11 +14,11 @@ export async function POST(request:Request){
  let body:unknown;try{body=await request.json();}catch{return reply({error:"Invalid request."},400);}
  const id=(body as {leadId?:unknown})?.leadId;
  if(typeof id!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return reply({error:"Invalid customer."},400);
- const {data:lead,error:leadError}=await db.from("leads").select("id,address").eq("id",id).eq("user_id",user.user.id).maybeSingle();
+ const {data:lead,error:leadError}=await db.from("leads").select("id,address").eq("id",id).maybeSingle();
  if(leadError)throw leadError;if(!lead)return reply({error:"Customer not found."},404);
  const address=lead.address.trim();if(!address)return reply({error:"Add a street address to this customer."},422);
  if(address.length>500)return reply({error:"The saved address is too long. Update the customer address."},422);
- const {data:cached,error:cacheError}=await db.from("customer_locations").select("lead_id,source_address,matched_address,lat,lng,status,checked_at").eq("lead_id",id).eq("user_id",user.user.id).maybeSingle();
+ const {data:cached,error:cacheError}=await db.from("customer_locations").select("lead_id,source_address,matched_address,lat,lng,status,checked_at").eq("lead_id",id).maybeSingle();
  if(cacheError)throw cacheError;
  if(cached&&reusableLocation(cached as AddressLocation,address)&&!(cached.status!=="matched"&&(body as {retryNotFound?:boolean}).retryNotFound===true))return reply({location:cached});
  const url=new URL("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress");url.searchParams.set("address",address);url.searchParams.set("benchmark","Public_AR_Current");url.searchParams.set("format","json");
