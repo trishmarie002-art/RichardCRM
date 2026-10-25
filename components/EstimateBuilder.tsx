@@ -106,6 +106,27 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
     finally { setBusy(false); }
   }
 
+  async function emailEstimate(record: Estimate) {
+    const recipient = customers.find(c => c.id === record.lead_id)?.email?.trim() || record.customer.email?.trim();
+    if (!recipient) { setMessage("Add an email address to this customer before sending."); return; }
+    if (!cloudMode || !supabase || !userId) { setMessage("Sign in to the cloud CRM to email an estimate."); return; }
+    const amount = currency(record.items.reduce((sum,item)=>sum+Math.round(item.quantity*item.rate*100)/100,0));
+    if (!window.confirm(`Email the saved estimate for ${amount} to ${recipient}? This sends the full itemized proposal.`)) return;
+    setBusy(true); setMessage("");
+    try {
+      const {data:{session},error:sessionError}=await supabase.auth.getSession();
+      if (sessionError || !session?.access_token) throw new Error("Your session has expired. Sign in again.");
+      const response=await fetch("/api/estimates/email",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+session.access_token},body:JSON.stringify({estimateId:record.id})});
+      const result=await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not send the email.");
+      if (result.statusUpdated) {
+        setHistory(current=>current.map(item=>item.id===record.id?{...item,status:"Sent",status_updated_at:new Date().toISOString()}:item));
+      }
+      setMessage(`Estimate emailed to ${result.to}.` + (result.statusUpdated ? " Status updated to Sent." : " Email delivered to the provider, but status could not be updated."));
+    } catch(error) { setMessage(error instanceof Error?error.message:"Could not send estimate."); }
+    finally {setBusy(false);}
+  }
+
   function revise(record: Estimate) {
     setItems(record.items.map(item=>({...item,id:crypto.randomUUID()})));
     setNotes(record.notes);
@@ -150,7 +171,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
       <div className="kpi"><span>{new Date(record.created_at).toLocaleDateString()} — {currency(record.items.reduce((sum,item)=>sum+Math.round(item.quantity*item.rate*100)/100,0))}</span><strong>{record.status || "Draft"}</strong></div>
       <div className="field"><label htmlFor={"status-"+record.id}>Estimate status</label><select id={"status-"+record.id} disabled={busy} value={record.status || "Draft"} onChange={event=>void updateStatus(record,event.target.value as EstimateStatus)}>{estimateStatuses.map(status=><option key={status}>{status}</option>)}</select></div>
       {record.status_updated_at && <p className="small muted">Last status update: {new Date(record.status_updated_at).toLocaleString()}</p>}
-      <div className="roofToolbar"><button className="mini" disabled={busy} onClick={()=>revise(record)}>Create revision</button><button className="mini" onClick={()=>printEstimate(record)}>Print / save PDF</button></div>
+      <div className="roofToolbar"><button className="mini" disabled={busy} onClick={()=>revise(record)}>Create revision</button><button className="mini" onClick={()=>printEstimate(record)}>Print / save PDF</button><button className="mini" disabled={busy || !record.customer.email} onClick={()=>void emailEstimate(record)}>Email estimate</button></div>
     </div>)}
     {!history.length && <p className="muted">No saved estimates for this customer.</p>}
   </div>;
