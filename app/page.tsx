@@ -14,6 +14,7 @@ import RoofReport from "@/components/RoofReport";
 import { edgeLength, type RoofEdge } from "@/lib/roof";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
 import EstimateBuilder from "@/components/EstimateBuilder";
+import SentEstimates from "@/components/SentEstimates";
 import RoofMap, { type RoofPoint } from "@/components/RoofMap";
 import { useEffect, useMemo, useState } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -425,7 +426,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices", "Calendar", "Lead Files", "Inspections", "Profit Calculator", "Follow-ups", "Estimate Options", "Warranties", "Message Templates", "Customer Map"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Sent Estimates", "Customer Workspace", "Daily Schedule", "Jobs", "Invoices", "Calendar", "Lead Files", "Inspections", "Profit Calculator", "Follow-ups", "Estimate Options", "Warranties", "Message Templates", "Customer Map"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);setTab(item);}}>
               {item}
             </button>
@@ -566,6 +567,7 @@ export default function Home() {
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} initialDay={calendarDay} />}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} initialCustomerId={customerContext} onSelect={setCustomerContext} onOpen={setTab} />}
         {tab === "Estimates" && <EstimateBuilder initialOption={estimateOption} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
+        {tab === "Sent Estimates" && <SentEstimates customers={leads} userId={userId} cloudMode={cloudMode} onOpenCustomer={id=>{setCustomerContext(id);setEstimateOption(null);setTab("Estimates");}} />}
         {tab === "Roof Measure" && (
           <>
           <div className="card" style={{marginBottom:16}}>
