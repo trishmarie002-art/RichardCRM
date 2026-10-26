@@ -315,7 +315,10 @@ export default function Home() {
   }
 
   async function deleteLead(id: string) {
-    if (syncing || !window.confirm("Delete this customer and their measurements, estimates, jobs and activity history? Uploaded files must be removed first.")) return;
+    const target = leads.find(lead => lead.id === id);
+    if (syncing || !target) return;
+    const confirmation = window.prompt(`Permanently delete ${target.name} and associated CRM records? This cannot be undone. Uploaded files must be removed first.\n\nType DELETE to confirm:`);
+    if (confirmation !== "DELETE") return;
     setSyncing(true);
     try {
       if (cloudMode) {
@@ -543,7 +546,7 @@ export default function Home() {
                       <td>{lead.email || "—"}</td>
                       <td>{lead.address || "—"}</td>
                       <td>{lead.notes || "—"}</td>
-                      <td><button className="mini" onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button></td>
+                      <td><div className="roofToolbar"><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
                     </tr>
                   ))}
                 </tbody>
