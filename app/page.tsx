@@ -13,6 +13,7 @@ import DailySchedule from "@/components/DailySchedule";
 import RoofReport from "@/components/RoofReport";
 import { edgeLength, type RoofEdge } from "@/lib/roof";
 import CustomerWorkspace from "@/components/CustomerWorkspace";
+import CustomerHub from "@/components/CustomerHub";
 import EstimateBuilder from "@/components/EstimateBuilder";
 import SentEstimates from "@/components/SentEstimates";
 import RoofMap, { type RoofPoint } from "@/components/RoofMap";
@@ -111,6 +112,7 @@ export default function Home() {
   ]);
   const [calendarDay,setCalendarDay]=useState("");
   const [customerContext,setCustomerContext]=useState("");
+  const [customerHubId,setCustomerHubId]=useState("");
   const [estimateOption,setEstimateOption]=useState<{name:string;scope:string;price:number}|null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [edges, setEdges] = useState<RoofEdge[]>([]);
@@ -426,7 +428,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Roof Measure", "Estimates", "Sent Estimates", "Customer Workspace", "Daily Schedule", "Invoices", "Calendar", "Lead Files", "Inspections", "Profit Calculator", "Follow-ups", "Estimate Options", "Warranties", "Message Templates", "Customer Map", "Jobs"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Customer Page", "Roof Measure", "Estimates", "Sent Estimates", "Customer Workspace", "Daily Schedule", "Invoices", "Calendar", "Lead Files", "Inspections", "Profit Calculator", "Follow-ups", "Estimate Options", "Warranties", "Message Templates", "Customer Map", "Jobs"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);setTab(item);}}>
               {item}
             </button>
@@ -542,12 +544,12 @@ export default function Home() {
                 <tbody>
                   {leads.filter(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
                     <tr key={lead.id}>
-                      <td><strong>{lead.name}</strong></td>
+                      <td><button type="button" className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}} style={{fontWeight:700,textAlign:"left"}}>{lead.name}</button></td>
                       <td>{lead.phone || "—"}</td>
                       <td>{lead.email || "—"}</td>
                       <td>{lead.address || "—"}</td>
                       <td>{lead.notes || "—"}</td>
-                      <td><div className="roofToolbar"><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
+                      <td><div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Page</button><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -565,6 +567,7 @@ export default function Home() {
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} initialDay={calendarDay} />}
+        {tab === "Customer Page" && (customerHubId && leads.some(lead=>lead.id===customerHubId) ? <CustomerHub key={customerHubId} customer={leads.find(lead=>lead.id===customerHubId)!} userId={userId} cloudMode={cloudMode} onBack={()=>setTab("Customers")} onEdit={()=>{setEditingLead(leads.find(lead=>lead.id===customerHubId)!);setShowForm(true);}} onMeasure={()=>{setSelectedLeadId(customerHubId);setTab("Roof Measure");}} /> : <div className="card"><h2>Customer Page</h2><p>Select a customer from the Customers tab to open their page.</p><button className="btn" onClick={()=>setTab("Customers")}>Choose customer</button></div>)}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} initialCustomerId={customerContext} onSelect={setCustomerContext} onOpen={setTab} />}
         {tab === "Estimates" && <EstimateBuilder initialOption={estimateOption} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Sent Estimates" && <SentEstimates customers={leads} userId={userId} cloudMode={cloudMode} onOpenCustomer={id=>{setCustomerContext(id);setEstimateOption(null);setTab("Estimates");}} />}
