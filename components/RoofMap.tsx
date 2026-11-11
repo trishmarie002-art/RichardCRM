@@ -206,6 +206,20 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       {edges.map((edge,index)=><div className="kpi" key={edge.id}><span><span style={{display:"inline-block",width:12,height:12,background:edgeColors[edge.kind],marginRight:8}}/>{index+1}. {edge.kind}</span><strong>{edgeLength(edge).toFixed(1)} ft</strong></div>)}
       <p className="small muted">Facet perimeter is each roof outline individually; shared boundaries are counted more than once. This is not the exterior roof perimeter. Measure eaves and rakes to estimate exterior trim.</p>
     </div>
+    <div className="card" style={{marginTop:12}}>
+      <h3>Perimeter totals</h3>
+      <div className="kpi">
+        <span>Total of traced facet perimeters</span>
+        <strong>{window.google?.maps?.geometry?.spherical
+          ?facets.filter(facet=>facet.points&&facet.points.length>=3).reduce((total,facet)=>total+window.google.maps.geometry.spherical.computeLength([...facet.points!,facet.points![0]])*3.280839895,0).toFixed(1)+" ft"
+          :"Map measurements unavailable"}</strong>
+      </div>
+      <div className="kpi">
+        <span>Exterior edges traced (eaves + rakes)</span>
+        <strong>{edges.filter(edge=>edge.kind==="eave"||edge.kind==="rake").reduce((total,edge)=>total+(Number(edge.horizontalFt)||0),0).toFixed(1)} ft</strong>
+      </div>
+      <p className="small muted">Facet perimeter total adds every roof section boundary, including shared sides, so it is not the true outside perimeter. The eave + rake total represents only those exterior edges you've traced or entered; it is incomplete until all outside edges are included. Overlapping or duplicate traces are not automatically deducted.</p>
+    </div>
     <p className="small muted">Pause tracing and drag the small colored corner or endpoint handles to adjust existing lines, then click Save Measurement below. Line numbers identify edge measurements; colors distinguish roof features. Satellite measurements must be verified on site.</p>
     {message && <div role="status" className="notice">{message}</div>}
   </div>;
