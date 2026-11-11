@@ -10,7 +10,30 @@ function displayName(name:string){return name.replace(/^[0-9a-f]{8}-[0-9a-f-]{27
 function category(file:Attachment){const mime=file.metadata?.mimetype||types[file.name.split(".").pop()?.toLowerCase()||""]||"";return mime.startsWith("image/")?"Photos":mime.startsWith("video/")?"Videos":"Documents";}
 function ZoomablePhoto({src,alt}:{src:string;alt:string}){
  const [zoom,setZoom]=useState(1);
+ const [navigatorSize,setNavigatorSize]=useState({width:180,height:110});
+ const [viewRect,setViewRect]=useState({x:0,y:0,width:1,height:1});
  const viewport=useRef<HTMLDivElement>(null);
+ function syncNavigator(){
+  const node=viewport.current;if(!node)return;
+  const fullWidth=Math.max(node.scrollWidth,1),fullHeight=Math.max(node.scrollHeight,1);
+  setViewRect({x:node.scrollLeft/fullWidth,y:node.scrollTop/fullHeight,width:Math.min(1,node.clientWidth/fullWidth),height:Math.min(1,node.clientHeight/fullHeight)});
+ }
+ function navigateTo(event:React.PointerEvent<HTMLDivElement>){
+  const node=viewport.current;if(!node||zoomRef.current<=1)return;
+  const bounds=event.currentTarget.getBoundingClientRect();
+  const x=Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width));
+  const y=Math.max(0,Math.min(1,(event.clientY-bounds.top)/bounds.height));
+  node.scrollLeft=x*node.scrollWidth-node.clientWidth/2;
+  node.scrollTop=y*node.scrollHeight-node.clientHeight/2;
+  syncNavigator();
+ }
+ useEffect(()=>{
+  const node=viewport.current;if(!node)return;
+  const observer=new ResizeObserver(syncNavigator);
+  observer.observe(node);
+  return()=>observer.disconnect();
+ },[]);
+
  const zoomRef=useRef(1);
  const drag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const pointers=useRef(new Map<number,{x:number;y:number}>());
@@ -28,12 +51,14 @@ function ZoomablePhoto({src,alt}:{src:string;alt:string}){
   if(node)requestAnimationFrame(()=>{
    node.scrollLeft=(left+px)*(next/previous)-px;
    node.scrollTop=(top+py)*(next/previous)-py;
+   syncNavigator();
   });
  }
  function reset(){
   drag.current=null;pointers.current.clear();pinch.current=null;
   zoomRef.current=1;setZoom(1);
   if(viewport.current){viewport.current.scrollLeft=0;viewport.current.scrollTop=0;}
+  requestAnimationFrame(syncNavigator);
  }
  return <div className="customerPhotoViewer">
   <div className="roofToolbar" style={{margin:"12px 0",alignItems:"center"}}>
@@ -43,7 +68,8 @@ function ZoomablePhoto({src,alt}:{src:string;alt:string}){
    <button type="button" className="mini" onClick={reset}>Reset</button>
    <a className="mini" href={src} target="_blank" rel="noreferrer">Open full size</a>
   </div>
-  <div ref={viewport} className="customerPhotoViewport" role="region" aria-label={"Zoomable photo: "+alt} tabIndex={0}
+  <div className="customerPhotoStage">
+  <div ref={viewport} onScroll={syncNavigator} className="customerPhotoViewport" role="region" aria-label={"Zoomable photo: "+alt} tabIndex={0}
    onWheel={event=>{
     if(event.ctrlKey||event.metaKey||event.shiftKey||Math.abs(event.deltaY)>0){
      event.preventDefault();
@@ -86,9 +112,21 @@ function ZoomablePhoto({src,alt}:{src:string;alt:string}){
     if(event.key==="-"){event.preventDefault();changeZoom(zoomRef.current/1.4);}
     if(event.key==="0"){event.preventDefault();reset();}
    }}>
-   <img src={src} alt={alt} draggable={false} style={{display:"block",width:(zoom*100)+"%",maxWidth:"none",height:"auto",objectFit:"contain",userSelect:"none",pointerEvents:"none"}}/>
+   <img src={src} alt={alt} draggable={false} onLoad={event=>{const image=event.currentTarget;const ratio=image.naturalWidth/Math.max(1,image.naturalHeight);setNavigatorSize({width:Math.min(180,110*ratio),height:Math.min(110,180/ratio)});requestAnimationFrame(syncNavigator);}} style={{display:"block",width:(zoom*100)+"%",maxWidth:"none",height:"auto",objectFit:"contain",userSelect:"none",pointerEvents:"none"}}/>
   </div>
-  <p className="small muted">Scroll over the photo to zoom toward the pointer, then click and drag to move around. On touchscreens, pinch to zoom and drag with one finger. Double-click to zoom; Reset returns to 100%.</p>
+  {zoom>1&&<div className="customerPhotoNavigatorWrap" aria-label="Photo navigation overview">
+   <div className="customerPhotoNavigatorTitle">Move around photo</div>
+   <div role="slider" aria-label="Move zoomed image using overview" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(viewRect.x*100)} tabIndex={0}
+    className="customerPhotoNavigator" style={{width:navigatorSize.width,height:navigatorSize.height}}
+    onPointerDown={event=>{if(event.pointerType==="mouse"&&event.button!==0)return;event.currentTarget.setPointerCapture(event.pointerId);navigateTo(event);}}
+    onPointerMove={event=>{if(event.buttons||event.pointerType==="touch"&&event.currentTarget.hasPointerCapture(event.pointerId))navigateTo(event);}}
+    onKeyDown={event=>{const node=viewport.current;if(!node)return;const amount=event.shiftKey?0.3:0.1;if(event.key==="ArrowRight")node.scrollLeft+=node.clientWidth*amount;else if(event.key==="ArrowLeft")node.scrollLeft-=node.clientWidth*amount;else if(event.key==="ArrowDown")node.scrollTop+=node.clientHeight*amount;else if(event.key==="ArrowUp")node.scrollTop-=node.clientHeight*amount;else return;event.preventDefault();syncNavigator();}}>
+    <img src={src} alt="" draggable={false} />
+    <div className="customerPhotoNavigatorRegion" style={{left:(viewRect.x*100)+"%",top:(viewRect.y*100)+"%",width:(viewRect.width*100)+"%",height:(viewRect.height*100)+"%"}}/>
+   </div>
+  </div>}
+  </div>
+  <p className="small muted">Use the mini-map in the lower right to jump to any part of a zoomed photo. Drag the highlighted rectangle, drag the main photo, or use the mouse wheel to zoom. Pinch on touchscreens.</p>
  </div>;
 }
 export default function LeadFiles({leads,userId,initialLeadId="",initialFilter="All",onSelect}:{leads:Lead[];userId:string|null;initialLeadId?:string;initialFilter?:"All"|"Photos"|"Videos"|"Documents";onSelect?:(id:string)=>void}){
