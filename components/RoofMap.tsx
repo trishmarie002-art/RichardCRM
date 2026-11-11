@@ -1,5 +1,5 @@
 "use client";
-import { validRoofOutline, type RoofEdge } from "@/lib/roof";
+import { validRoofOutline, edgeLength, type RoofEdge } from "@/lib/roof";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
@@ -8,7 +8,9 @@ export type TracedFacet = { id: number; name: string; footprintSqFt: number; pit
 // Google Maps is loaded by its hosted script; isolate its runtime interface here.
 declare global { interface Window { google?: any; gm_authFailure?: () => void; } }
 
-export default function RoofMap({ address, onFacet, onEdge, facets, edges }: { address: string; onFacet: (facet: TracedFacet) => void; onEdge: (edge: RoofEdge) => void; facets: { points?: RoofPoint[] }[]; edges: RoofEdge[] }) {
+const edgeColors:Record<RoofEdge["kind"],string>={ridge:"#ef4444",hip:"#f59e0b",valley:"#a855f7",eave:"#22c55e",rake:"#38bdf8"};
+const facetColors=["#ffdb58","#ff7b54","#76e4f7","#de83fc","#66e4a3","#ff9cdb"];
+export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdgeUpdate, facets, edges }: { address: string; onFacet: (facet: TracedFacet) => void; onEdge: (edge: RoofEdge) => void; onFacetUpdate:(id:number,points:RoofPoint[],area:number)=>void; onEdgeUpdate:(id:string,points:RoofPoint[],distance:number)=>void; facets: {id:number;name:string;footprintSqFt:number;points?: RoofPoint[] }[]; edges: RoofEdge[] }) {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
@@ -27,6 +29,7 @@ export default function RoofMap({ address, onFacet, onEdge, facets, edges }: { a
   const [message, setMessage] = useState("");
   const [searching, setSearching] = useState(false);
   const searchVersion = useRef(0);
+  const fittedInitialBounds=useRef(false);
   useEffect(()=>{const previous=window.gm_authFailure;window.gm_authFailure=()=>{setAuthFailed(true);setDrawing(false);setMessage("Google Maps rejected the connection. Check the key, enabled APIs, billing and allowed website.");};return()=>{window.gm_authFailure=previous;searchVersion.current++;};},[]);
   useEffect(() => { autoLocated.current=false;setQuery(address); setPoints([]); setDrawing(false); searchVersion.current++; }, [address]);
 
@@ -56,18 +59,55 @@ export default function RoofMap({ address, onFacet, onEdge, facets, edges }: { a
   useEffect(() => {
     if (!ready || !map.current) return;
     const maps=window.google.maps;
-    const overlays=[
-      ...facets.filter(facet=>facet.points?.length).map(facet=>new maps.Polygon({map:map.current,paths:facet.points,strokeColor:"#34d399",fillColor:"#34d399",fillOpacity:.12})),
-      ...edges.filter(edge=>edge.points?.length).map(edge=>new maps.Polyline({map:map.current,path:edge.points,strokeColor:"#60a5fa",strokeWeight:3}))
-    ];
-    if(facets.some(facet=>facet.points?.length) || edges.some(edge=>edge.points?.length)) {
+    const overlays:any[]=[];
+    const listeners:any[]=[];
+    const savedFacets=facets.filter(f=>f.points && f.points.length>=3);
+    savedFacets.forEach((facet,index)=>{
+      const color=facetColors[index%facetColors.length];
+      const path=facet.points!;
+      const polygonOverlay=new maps.Polygon({map:map.current,paths:path,strokeColor:color,fillColor:color,fillOpacity:.18,strokeWeight:3});
+      overlays.push(polygonOverlay);
+      const perimeter=maps.geometry.spherical.computeLength([...path,path[0]])*3.280839895;
+      const label=new maps.Marker({map:map.current,position:path[0],label:{text:"F"+(index+1),color:"#111827",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:"#111827",strokeWeight:1},title:facet.name+" — outline perimeter "+perimeter.toFixed(1)+" ft"});
+      overlays.push(label);
+      path.forEach((point,vertexIndex)=>{
+        const marker=new maps.Marker({map:map.current,position:point,draggable:!drawing,icon:{path:maps.SymbolPath.CIRCLE,scale:5,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:"Drag roof corner "+(vertexIndex+1)+" to adjust"});
+        overlays.push(marker);
+        listeners.push(marker.addListener("dragend",()=>{
+          const updated=path.map((p,i)=>i===vertexIndex?marker.getPosition().toJSON():p);
+          if(!validRoofOutline(updated)){setMessage("The edited roof shape is invalid; the corner was not saved.");marker.setPosition(point);return;}
+          const area=maps.geometry.spherical.computeArea(updated)*10.76391041671;
+          if(Number.isFinite(area)&&area>1)onFacetUpdate(facet.id,updated,area);
+        }));
+      });
+    });
+    edges.filter(e=>e.points?.length===2).forEach((edge,index)=>{
+      const color=edgeColors[edge.kind];
+      const path=edge.points!;
+      const overlay=new maps.Polyline({map:map.current,path,strokeColor:color,strokeWeight:4});
+      overlays.push(overlay);
+      const midpoint={lat:(path[0].lat+path[1].lat)/2,lng:(path[0].lng+path[1].lng)/2};
+      overlays.push(new maps.Marker({map:map.current,position:midpoint,label:{text:String(index+1),color:"#fff",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:12,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:edge.kind+" "+edgeLength(edge).toFixed(1)+" ft"}));
+      path.forEach((point,vertexIndex)=>{
+        const marker=new maps.Marker({map:map.current,position:point,draggable:!drawing,icon:{path:maps.SymbolPath.CIRCLE,scale:5,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:"Drag endpoint "+(vertexIndex+1)+" to adjust"});
+        overlays.push(marker);
+        listeners.push(marker.addListener("dragend",()=>{
+          const updated=path.map((p,i)=>i===vertexIndex?marker.getPosition().toJSON():p);
+          const distance=maps.geometry.spherical.computeDistanceBetween(updated[0],updated[1])*3.280839895;
+          if(Number.isFinite(distance)&&distance>0.1)onEdgeUpdate(edge.id,updated,distance);
+          else {setMessage("An edge requires distinct endpoints.");marker.setPosition(point);}
+        }));
+      });
+    });
+    if(!fittedInitialBounds.current&&(savedFacets.length||edges.some(e=>e.points?.length))){
+      fittedInitialBounds.current=true;
       const bounds=new maps.LatLngBounds();
-      facets.forEach(facet=>facet.points?.forEach(point=>bounds.extend(point)));
-      edges.forEach(edge=>edge.points?.forEach(point=>bounds.extend(point)));
+      savedFacets.forEach(f=>f.points?.forEach(p=>bounds.extend(p)));
+      edges.forEach(e=>e.points?.forEach(p=>bounds.extend(p)));
       map.current.fitBounds(bounds,24);
     }
-    return()=>overlays.forEach(overlay=>overlay.setMap(null));
-  },[facets,edges,ready]);
+    return()=>{listeners.forEach(listener=>listener.remove());overlays.forEach(overlay=>overlay.setMap(null));};
+  },[facets,edges,ready,drawing,onFacetUpdate,onEdgeUpdate]);
 
   useEffect(()=>{if(!mapReady||autoLocated.current||!address.trim())return;autoLocated.current=true;if(!facets.some(f=>f.points?.length)&&!edges.some(e=>e.points?.length))void search(address);},[mapReady,address,facets,edges]);
 
@@ -123,7 +163,12 @@ export default function RoofMap({ address, onFacet, onEdge, facets, edges }: { a
       <div className="field"><label htmlFor="facet-pitch">Facet pitch</label><select id="facet-pitch" value={pitch??""} onChange={event => setPitch(event.target.value===""?null:Number(event.target.value))}><option value="">Choose inspected pitch</option>{Array.from({length:13},(_,i)=><option key={i} value={i}>{i}/12</option>)}</select></div>
       <button className="btn" disabled={!mapReady||authFailed||searching||(tool==="facet"?(points.length<3||pitch===null):points.length!==2)} onClick={finish}>Add {tool} ({points.length} corners)</button>
     </div>
-    <p className="small muted">For facets, trace corners in order. For edges, click two endpoints. Zero height difference gives horizontal length only. Trace each facet once. Pitch must be supplied from inspection; imagery does not determine pitch. Aerial results are estimates and need field verification.</p>
+    <div className="card" style={{marginTop:12}}><h3>Traced lines and perimeter</h3>
+      {facets.map((facet,index)=><div className="kpi" key={facet.id}><span><span style={{display:"inline-block",width:12,height:12,background:facetColors[index%facetColors.length],marginRight:8}}/>Facet {index+1}: {facet.name}</span><strong>{facet.points?.length&&window.google?.maps?.geometry?.spherical?(window.google.maps.geometry.spherical.computeLength([...facet.points,facet.points[0]])*3.280839895).toFixed(1)+" ft perimeter":"Outline not available"}</strong></div>)}
+      {edges.map((edge,index)=><div className="kpi" key={edge.id}><span><span style={{display:"inline-block",width:12,height:12,background:edgeColors[edge.kind],marginRight:8}}/>{index+1}. {edge.kind}</span><strong>{edgeLength(edge).toFixed(1)} ft</strong></div>)}
+      <p className="small muted">Facet perimeter is each roof outline individually; shared boundaries are counted more than once. This is not the exterior roof perimeter. Measure eaves and rakes to estimate exterior trim.</p>
+    </div>
+    <p className="small muted">Pause tracing and drag the small colored corner or endpoint handles to adjust existing lines, then click Save Measurement below. Line numbers identify edge measurements; colors distinguish roof features. Satellite measurements must be verified on site.</p>
     {message && <div role="status" className="notice">{message}</div>}
   </div>;
 }
