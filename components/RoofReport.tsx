@@ -93,11 +93,12 @@ function RoofPerspective({sections,edges}:{sections:Section[];edges:RoofEdge[]})
   return {section,index,vertices,depth:cx+cy,pitch,center:{x:cx,y:cy},rise};
  }).sort((u,v)=>u.depth-v.depth);
  const iso=(p:P3)=>({x:380+(p.x-p.y)*.84,y:230+(p.x+p.y)*.42-p.z*1.35});
- const projected=roofFaces.flatMap(f=>f.vertices.map(iso));
+ const projected=roofFaces.flatMap(f=>[...f.vertices,...f.vertices.map(v=>({...v,z:-2}))].map(iso));
  const pxMin=Math.min(...projected.map(p=>p.x)),pxMax=Math.max(...projected.map(p=>p.x));
  const pyMin=Math.min(...projected.map(p=>p.y)),pyMax=Math.max(...projected.map(p=>p.y));
- const factor=Math.min(1.9,570/Math.max(1,pxMax-pxMin),280/Math.max(1,pyMax-pyMin));
- const offsetX=360-factor*(pxMin+pxMax)/2,offsetY=204-factor*(pyMin+pyMax)/2;
+ // Scale to fit the available illustration area. The old 1.9 cap made real roofs microscopic.
+ const factor=Math.min(600/Math.max(1,pxMax-pxMin),258/Math.max(1,pyMax-pyMin));
+ const offsetX=360-factor*(pxMin+pxMax)/2,offsetY=196-factor*(pyMin+pyMax)/2;
  const screen=(p:P3)=>{const q=iso(p);return {x:q.x*factor+offsetX,y:q.y*factor+offsetY};};
  const poly=(arr:P3[])=>arr.map(p=>{const q=screen(p);return q.x.toFixed(1)+","+q.y.toFixed(1);}).join(" ");
  const roofColors=["#859cad","#9caeac","#c6a892","#a6a3b9","#a4b2a3","#bbadb0"];
@@ -113,7 +114,7 @@ function RoofPerspective({sections,edges}:{sections:Section[];edges:RoofEdge[]})
    </defs>
    <rect width="720" height="430" rx="12" fill="url(#roof-report-sky)"/>
    <rect x="10" y="12" width="700" height="352" rx="8" fill="url(#roof-report-grid)" opacity=".35"/>
-   <ellipse cx="360" cy="292" rx="218" ry="49" fill="#53677d" opacity=".13" filter="url(#roof-report-shadow)"/>
+   <ellipse cx="360" cy="307" rx="232" ry="38" fill="#53677d" opacity=".10" filter="url(#roof-report-shadow)"/>
    {roofFaces.map(face=>{
     const n=face.vertices.length;
     const walls=face.vertices.map((v,i)=>{
@@ -125,14 +126,14 @@ function RoofPerspective({sections,edges}:{sections:Section[];edges:RoofEdge[]})
      {walls.map(w=><polygon key={w.i} points={poly(w.quad)} fill={w.i%2===0?"#d0d9e3":"#aab8c7"} stroke="#66788b" strokeWidth="1.1" strokeLinejoin="round"/>)}
      <polygon points={poly(face.vertices)} fill={roofColors[face.index%roofColors.length]} stroke="#30485f" strokeWidth="2.3" strokeLinejoin="round"/>
      <polygon points={poly(face.vertices)} fill="#fff" fillOpacity=".13" stroke="none"/>
-     <circle cx={textPosition.x} cy={textPosition.y} r="14" fill="#fff" opacity=".92"/>
-     <text x={textPosition.x} y={textPosition.y+4} textAnchor="middle" fontSize="12" fontWeight="700" fill="#1d3b52">{face.index+1}</text>
+     <circle cx={textPosition.x} cy={textPosition.y} r="10" fill="#fff" fillOpacity=".95" stroke="#334155" strokeWidth=".8"/>
+     <text x={textPosition.x} y={textPosition.y+3.5} textAnchor="middle" fontSize="10" fontWeight="700" fill="#1d3b52">{face.index+1}</text>
     </g>;
    })}
    {featureEdges.map(edge=>{
     const a=local(edge.points![0]),b=local(edge.points![1]);
     const q1=screen({...a,z:7}),q2=screen({...b,z:7});
-    return <g key={edge.id}><line x1={q1.x} y1={q1.y} x2={q2.x} y2={q2.y} stroke="#f8fafc" strokeWidth="6" strokeLinecap="round"/><line x1={q1.x} y1={q1.y} x2={q2.x} y2={q2.y} stroke={edgeColors[edge.kind]} strokeWidth="3.6" strokeLinecap="round"/></g>;
+    return <g key={edge.id}><line x1={q1.x} y1={q1.y} x2={q2.x} y2={q2.y} stroke="#f8fafc" strokeWidth="4" strokeLinecap="round"/><line x1={q1.x} y1={q1.y} x2={q2.x} y2={q2.y} stroke={edgeColors[edge.kind]} strokeWidth="2.4" strokeLinecap="round"/></g>;
    })}
    <rect x="18" y="17" width="236" height="37" rx="7" fill="#fff" fillOpacity=".96" stroke="#d5dfe8"/>
    <text x="31" y="33" fontSize="12" fontWeight="700" fill="#21394d">ROOF GEOMETRY PREVIEW</text>
@@ -140,9 +141,9 @@ function RoofPerspective({sections,edges}:{sections:Section[];edges:RoofEdge[]})
    <g transform="translate(650 30)"><circle r="23" fill="#fff" stroke="#becbd8"/><path d="M0 15 V-13 M-5 -3 L0 -13 L5 -3" stroke="#456079" strokeWidth="2" fill="none"/><text y="-17" textAnchor="middle" fontSize="10" fontWeight="700" fill="#334155">N</text></g>
    <rect x="18" y="366" width="684" height="47" rx="7" fill="#fff" fillOpacity=".95" stroke="#d6e0e9"/>
    {(["ridge","hip","valley","eave","rake"] as const).map((kind,i)=><g key={kind} transform={`translate(${30+i*132} 385)`}><line x1="0" y1="0" x2="21" y2="0" stroke={edgeColors[kind]} strokeWidth="4" strokeLinecap="round"/><text x="28" y="4" fontSize="12" fill="#34465a">{kind.charAt(0).toUpperCase()+kind.slice(1)}</text></g>)}
-   <text x="30" y="402" fontSize="10.5" fill="#64748b">Numbers identify roof facets · roof heights and slopes are conceptual</text>
+   <text x="30" y="402" fontSize="10.5" fill="#64748b">Facet numbers correspond to the measurement table below · elevations conceptual</text>
   </svg>
-  <p>Isometric view of the actual traced facet boundaries with estimated visual slope based on entered pitch. Roof elevation, ridge connections and wall heights are not measured. Use the satellite image and measurement tables for estimating.</p>
+  <p>Enlarged isometric roof plan showing traced boundaries and conceptual slopes based on entered pitch. Roof elevation, ridge connections and wall heights are not measured. Use the satellite image and measurement tables for estimating.</p>
  </div>;
 }
 export default function RoofReport({customer,sections,edges,waste}:{customer?:{name:string;address:string};sections:Section[];edges:RoofEdge[];waste:number}) {
