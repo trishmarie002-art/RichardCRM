@@ -78,26 +78,12 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
     const maps=window.google.maps;
     const overlays:any[]=[];
     const listeners:any[]=[];
-    const segmentLabel=(from:RoofPoint,to:RoofPoint,feet:number,color:string)=>{
-      const position=maps.geometry.spherical.interpolate(from,to,0.5);
-      const marker=new maps.Marker({
-        map:map.current,position,clickable:false,zIndex:100,
-        icon:{path:maps.SymbolPath.CIRCLE,scale:0,fillOpacity:0,strokeOpacity:0},
-        label:{text:feet.toFixed(1)+" ft",color:"#ffffff",fontSize:"12px",fontWeight:"700",className:"roof-length-label"}
-      });
-      overlays.push(marker);
-    };
     const savedFacets=facets.filter(f=>f.points && f.points.length>=3);
     savedFacets.forEach((facet,index)=>{
       const color=facetColors[index%facetColors.length];
       const path=facet.points!;
       const polygonOverlay=new maps.Polygon({map:map.current,paths:path,strokeColor:color,fillColor:color,fillOpacity:.12,strokeWeight:3,clickable:false,zIndex:1});
       overlays.push(polygonOverlay);
-      path.forEach((point,sideIndex)=>{
-        const next=path[(sideIndex+1)%path.length];
-        const feet=maps.geometry.spherical.computeDistanceBetween(point,next)*3.280839895;
-        if(Number.isFinite(feet)&&feet>0.1)segmentLabel(point,next,feet,color);
-      });
       const perimeter=maps.geometry.spherical.computeLength([...path,path[0]])*3.280839895;
       const label=new maps.Marker({map:map.current,position:path[0],clickable:false,label:{text:"F"+(index+1),color:"#111827",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:"#111827",strokeWeight:1},title:facet.name+" — outline perimeter "+perimeter.toFixed(1)+" ft"});
       overlays.push(label);
@@ -117,7 +103,6 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       const path=edge.points!;
       const overlay=new maps.Polyline({map:map.current,path,strokeColor:color,strokeWeight:4,clickable:false,zIndex:10});
       overlays.push(overlay);
-      segmentLabel(path[0],path[1],edgeLength(edge),color);
       const midpoint={lat:(path[0].lat+path[1].lat)/2,lng:(path[0].lng+path[1].lng)/2};
       overlays.push(new maps.Marker({map:map.current,position:midpoint,clickable:false,label:{text:String(index+1),color:"#fff",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:12,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:edge.kind+" "+edgeLength(edge).toFixed(1)+" ft"}));
       path.forEach((point,vertexIndex)=>{
@@ -140,25 +125,6 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
     }
     return()=>{listeners.forEach(listener=>listener.remove());overlays.forEach(overlay=>overlay.setMap(null));};
   },[facets,edges,ready,drawing,onFacetUpdate,onEdgeUpdate]);
-
-  useEffect(()=>{
-    if(!ready||!map.current||points.length<2)return;
-    const maps=window.google?.maps;
-    if(!maps?.geometry?.spherical)return;
-    const labels:any[]=[];
-    const segments=tool==="facet"&&points.length>=3?points.length:points.length-1;
-    for(let i=0;i<segments;i++){
-      const start=points[i],end=points[(i+1)%points.length];
-      const feet=maps.geometry.spherical.computeDistanceBetween(start,end)*3.280839895;
-      if(!Number.isFinite(feet)||feet<0.1)continue;
-      labels.push(new maps.Marker({
-        map:map.current,position:maps.geometry.spherical.interpolate(start,end,0.5),clickable:false,zIndex:110,
-        icon:{path:maps.SymbolPath.CIRCLE,scale:0,fillOpacity:0,strokeOpacity:0},
-        label:{text:feet.toFixed(1)+" ft",color:"#fff",fontSize:"12px",fontWeight:"700",className:"roof-length-label"}
-      }));
-    }
-    return()=>labels.forEach(label=>label.setMap(null));
-  },[points,tool,ready]);
 
   useEffect(()=>{if(!mapReady||autoLocated.current||!address.trim())return;autoLocated.current=true;if(!facets.some(f=>f.points?.length)&&!edges.some(e=>e.points?.length))void search(address);},[mapReady,address,facets,edges]);
 
@@ -223,8 +189,20 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       <button className="btn" disabled={!mapReady||authFailed||searching||(tool==="facet"?(points.length<3||pitch===null):points.length!==2)} onClick={finish}>Add {tool} ({points.length} corners)</button>
     </div>
     <p className="small muted" role="status">Active tool: <strong>{tool==="facet"?"Roof facet":tool}</strong>. {points.length?points.length+" point(s) in the current trace.":"No points in the current trace."} Switching tools keeps each tool’s unfinished points. Draw multiple lines of the same type consecutively; use Save Measurement to persist all layers.</p>
-    <div className="card" style={{marginTop:12}}><h3>Traced lines and perimeter</h3>
+    <div className="card" style={{marginTop:12}}><h3>Roof measurement lengths (ft)</h3><p className="small muted">Length values appear here instead of on the satellite image, so overlapping roof lines remain clear.</p>
       {facets.map((facet,index)=><div className="kpi" key={facet.id}><span><span style={{display:"inline-block",width:12,height:12,background:facetColors[index%facetColors.length],marginRight:8}}/>Facet {index+1}: {facet.name}</span><strong>{facet.points?.length&&window.google?.maps?.geometry?.spherical?(window.google.maps.geometry.spherical.computeLength([...facet.points,facet.points[0]])*3.280839895).toFixed(1)+" ft perimeter":"Outline not available"}</strong></div>)}
+      {facets.map((facet,index)=>facet.points&&facet.points.length>=3&&window.google?.maps?.geometry?.spherical?<div key={"facet-sides-"+facet.id} style={{margin:"6px 0 12px",padding:"8px 12px",borderLeft:"3px solid "+facetColors[index%facetColors.length],background:"#f7f9fc"}}>
+        <strong>Facet {index+1} side lengths</strong>
+        <div className="roofToolbar" style={{gap:10,marginTop:6}}>
+        {facet.points.map((p,i)=><span key={i} className="badge">Side {i+1}: {(window.google.maps.geometry.spherical.computeDistanceBetween(p,facet.points![(i+1)%facet.points!.length])*3.280839895).toFixed(1)} ft</span>)}
+        </div>
+      </div>:null)}
+      {points.length>=2&&window.google?.maps?.geometry?.spherical&&<div style={{padding:"10px 12px",margin:"8px 0",background:"#f1f5f9",borderRadius:8}}>
+       <strong>Current {tool==="facet"?"facet":"edge"} trace (not yet saved)</strong>
+       <div className="roofToolbar" style={{gap:10,marginTop:6}}>
+        {Array.from({length:tool==="facet"&&points.length>=3?points.length:points.length-1},(_,i)=><span className="badge" key={i}>Line {i+1}: {(window.google.maps.geometry.spherical.computeDistanceBetween(points[i],points[(i+1)%points.length])*3.280839895).toFixed(1)} ft</span>)}
+       </div>
+      </div>}
       {edges.map((edge,index)=><div className="kpi" key={edge.id}><span><span style={{display:"inline-block",width:12,height:12,background:edgeColors[edge.kind],marginRight:8}}/>{index+1}. {edge.kind}</span><strong>{edgeLength(edge).toFixed(1)} ft</strong></div>)}
       <p className="small muted">Facet perimeter is each roof outline individually; shared boundaries are counted more than once. This is not the exterior roof perimeter. Measure eaves and rakes to estimate exterior trim.</p>
     </div>
