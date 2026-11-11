@@ -10,6 +10,7 @@ function displayName(name:string){return name.replace(/^[0-9a-f]{8}-[0-9a-f-]{27
 function category(file:Attachment){const mime=file.metadata?.mimetype||types[file.name.split(".").pop()?.toLowerCase()||""]||"";return mime.startsWith("image/")?"Photos":mime.startsWith("video/")?"Videos":"Documents";}
 function ZoomablePhoto({src,alt}:{src:string;alt:string}){
  const [zoom,setZoom]=useState(1);
+ const [fullScreen,setFullScreen]=useState(false);
  const [navigatorSize,setNavigatorSize]=useState({width:180,height:110});
  const [viewRect,setViewRect]=useState({x:0,y:0,width:1,height:1});
  const viewport=useRef<HTMLDivElement>(null);
@@ -34,6 +35,13 @@ function ZoomablePhoto({src,alt}:{src:string;alt:string}){
   return()=>observer.disconnect();
  },[]);
 
+ useEffect(()=>{
+  if(!fullScreen)return;
+  const close=(event:KeyboardEvent)=>{if(event.key==="Escape")setFullScreen(false);};
+  window.addEventListener("keydown",close);
+  return()=>window.removeEventListener("keydown",close);
+ },[fullScreen]);
+ useEffect(()=>{requestAnimationFrame(syncNavigator);},[fullScreen]);
  const zoomRef=useRef(1);
  const drag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const pointers=useRef(new Map<number,{x:number;y:number}>());
@@ -60,13 +68,14 @@ function ZoomablePhoto({src,alt}:{src:string;alt:string}){
   if(viewport.current){viewport.current.scrollLeft=0;viewport.current.scrollTop=0;}
   requestAnimationFrame(syncNavigator);
  }
- return <div className="customerPhotoViewer">
+ return <div className={fullScreen?"customerPhotoViewer customerPhotoFullscreen":"customerPhotoViewer"} role={fullScreen?"dialog":undefined} aria-modal={fullScreen?true:undefined} aria-label={fullScreen?"Full page photo viewer":undefined}>
   <div className="roofToolbar" style={{margin:"12px 0",alignItems:"center"}}>
    <button type="button" className="mini" onClick={()=>changeZoom(zoomRef.current/1.4)} disabled={zoom<=1} aria-label="Zoom out">− Zoom out</button>
    <strong aria-live="polite">{Math.round(zoom*100)}%</strong>
    <button type="button" className="mini" onClick={()=>changeZoom(zoomRef.current*1.4)} disabled={zoom>=8} aria-label="Zoom in">+ Zoom in</button>
    <button type="button" className="mini" onClick={reset}>Reset</button>
-   <a className="mini" href={src} target="_blank" rel="noreferrer">Open full size</a>
+   <button type="button" className="mini" onClick={()=>setFullScreen(current=>!current)}>{fullScreen?"Exit full page":"Full page photo view"}</button>
+   <a className="mini" href={src} target="_blank" rel="noreferrer">Original photo</a>
   </div>
   <div className="customerPhotoStage">
   <div ref={viewport} onScroll={syncNavigator} className="customerPhotoViewport" role="region" aria-label={"Zoomable photo: "+alt} tabIndex={0}
