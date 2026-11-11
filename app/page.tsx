@@ -713,14 +713,10 @@ export default function Home() {
               <option value="">+ Start a new measurement</option>
               {savedMeasurements.map((record,index)=><option key={record.id} value={record.id}>{new Date(record.created_at).toLocaleString()}{index===0?" (latest)":""}</option>)}
             </select></div>
-            <div className="roofToolbar" style={{marginTop:10}}>
-              <button type="button" className="mini" disabled={syncing||!editingMeasurementId} onClick={()=>void deleteMeasurement()} style={{color:"#b42318",borderColor:"#b42318"}}>Delete Entire Measurement</button>
-              <span className="small muted">Deletes only the selected saved measurement, not the customer or other saved measurements.</span>
-            </div>
             <p className="small muted">Selecting an existing measurement loads its roof sections, mapped outlines, edge lengths, and waste factor. Saving updates that record, rather than creating a duplicate.</p></>:<p className="muted">No saved measurement yet. Trace the roof or add measurements manually, then save.</p>}
             {measurementMessage&&<p className="notice" role="status">{measurementMessage}</p>}
           </div>}
-          {selectedLeadId && measurementReady ? <RoofMap facets={sections} edges={edges} onFacetUpdate={updateFacetGeometry} onEdgeUpdate={updateEdgeGeometry} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId+"-"+measurementRevision} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
+          {selectedLeadId && measurementReady ? <RoofMap onDeleteMeasurement={()=>void deleteMeasurement()} canDeleteMeasurement={Boolean(editingMeasurementId)} deletingMeasurement={syncing} facets={sections} edges={edges} onFacetUpdate={updateFacetGeometry} onEdgeUpdate={updateEdgeGeometry} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId+"-"+measurementRevision} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
           <div className="measureLayout">
             <div className="card">
               <div className="sectionTitle">
