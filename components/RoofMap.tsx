@@ -99,7 +99,7 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
         if(Number.isFinite(feet)&&feet>0.1)segmentLabel(point,next,feet,color);
       });
       const perimeter=maps.geometry.spherical.computeLength([...path,path[0]])*3.280839895;
-      const label=new maps.Marker({map:map.current,position:path[0],label:{text:"F"+(index+1),color:"#111827",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:"#111827",strokeWeight:1},title:facet.name+" — outline perimeter "+perimeter.toFixed(1)+" ft"});
+      const label=new maps.Marker({map:map.current,position:path[0],clickable:false,label:{text:"F"+(index+1),color:"#111827",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:"#111827",strokeWeight:1},title:facet.name+" — outline perimeter "+perimeter.toFixed(1)+" ft"});
       overlays.push(label);
       path.forEach((point,vertexIndex)=>{
         const marker=new maps.Marker({map:map.current,position:point,draggable:!drawing,clickable:!drawing,icon:{path:maps.SymbolPath.CIRCLE,scale:5,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:"Drag roof corner "+(vertexIndex+1)+" to adjust"});
@@ -119,9 +119,9 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       overlays.push(overlay);
       segmentLabel(path[0],path[1],edgeLength(edge),color);
       const midpoint={lat:(path[0].lat+path[1].lat)/2,lng:(path[0].lng+path[1].lng)/2};
-      overlays.push(new maps.Marker({map:map.current,position:midpoint,label:{text:String(index+1),color:"#fff",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:12,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:edge.kind+" "+edgeLength(edge).toFixed(1)+" ft"}));
+      overlays.push(new maps.Marker({map:map.current,position:midpoint,clickable:false,label:{text:String(index+1),color:"#fff",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:12,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:edge.kind+" "+edgeLength(edge).toFixed(1)+" ft"}));
       path.forEach((point,vertexIndex)=>{
-        const marker=new maps.Marker({map:map.current,position:point,draggable:!drawing,icon:{path:maps.SymbolPath.CIRCLE,scale:5,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:"Drag endpoint "+(vertexIndex+1)+" to adjust"});
+        const marker=new maps.Marker({map:map.current,position:point,draggable:!drawing,clickable:!drawing,icon:{path:maps.SymbolPath.CIRCLE,scale:5,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:"Drag endpoint "+(vertexIndex+1)+" to adjust"});
         overlays.push(marker);
         listeners.push(marker.addListener("dragend",()=>{
           const updated=path.map((p,i)=>i===vertexIndex?marker.getPosition().toJSON():p);
@@ -199,7 +199,7 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
   return <div className="card" style={{ marginBottom: 16 }}>
     <Script src={"https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&libraries=geometry&v=weekly"} id="star-roof-google-maps" onReady={() => setReady(true)} onError={() => setMessage("Satellite map could not load. Check the API key and website restrictions.")} />
     <h2>Satellite roof tracing</h2>
-    <p className="muted">Trace multiple measurement types on the same roof. Saved lines and facets stay visible when you change tools, and unfinished traces are restored when you switch back. You can layer ridges, hips, valleys, eaves and rakes over facet outlines without clearing previous measurements.</p>
+    <p className="muted">All measurement tools can overlap: draw roof facets, ridges, hips, valleys, eaves, and rakes on the same roof—even directly over existing lines. Switching tools preserves unfinished traces, and saving one trace does not clear the others. Pause tracing to drag and edit saved corners.</p>
     <form onSubmit={event => { event.preventDefault(); void search(query); }} className="roofToolbar">
       <div className="field" style={{ flex: 1 }}><label htmlFor="roof-address">Property address</label><input id="roof-address" value={query} onChange={event => setQuery(event.target.value)} required /></div>
       <button className="btn" disabled={!mapReady || authFailed || searching}>{searching ? "Finding…" : "Find roof"}</button>
