@@ -17,7 +17,7 @@ import CustomerHub from "@/components/CustomerHub";
 import EstimateBuilder from "@/components/EstimateBuilder";
 import SentEstimates from "@/components/SentEstimates";
 import RoofMap, { type RoofPoint } from "@/components/RoofMap";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Lead = {
@@ -127,6 +127,12 @@ export default function Home() {
   const [estimateOption,setEstimateOption]=useState<{name:string;scope:string;price:number}|null>(null);
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [edges, setEdges] = useState<RoofEdge[]>([]);
+  const updateFacetGeometry=useCallback((id:number,points:RoofPoint[],footprintSqFt:number)=>{
+    setSections(current=>current.map(facet=>facet.id===id?{...facet,points,footprintSqFt}:facet));
+  },[]);
+  const updateEdgeGeometry=useCallback((id:string,points:RoofPoint[],horizontalFt:number)=>{
+    setEdges(current=>current.map(edge=>edge.id===id?{...edge,points,horizontalFt}:edge));
+  },[]);
   const [measurementReady, setMeasurementReady] = useState(false);
   const [waste, setWaste] = useState(10);
   const [userId, setUserId] = useState<string | null>(null);
@@ -610,7 +616,7 @@ export default function Home() {
               </select>
             </div>
           </div>
-          {selectedLeadId && measurementReady ? <RoofMap facets={sections} edges={edges} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
+          {selectedLeadId && measurementReady ? <RoofMap facets={sections} edges={edges} onFacetUpdate={updateFacetGeometry} onEdgeUpdate={updateEdgeGeometry} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
           <div className="measureLayout">
             <div className="card">
               <div className="sectionTitle">
