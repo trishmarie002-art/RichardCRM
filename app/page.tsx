@@ -511,7 +511,7 @@ export default function Home() {
 
         <div className="nav">
           {["Dashboard", "Customers", "Customer Page", "Follow-ups", "Calendar"].map((item) => (
-            <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);setTab(item);}}>
+            <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);if(item==="Customer Page"){setCustomerHubId("");setSearch("");}setTab(item);}}>
               {item}
             </button>
           ))}
@@ -651,7 +651,13 @@ export default function Home() {
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} initialDay={calendarDay} />}
-        {tab === "Customer Page" && (customerHubId && leads.some(lead=>lead.id===customerHubId) ? <CustomerHub key={customerHubId} customer={leads.find(lead=>lead.id===customerHubId)!} userId={userId} cloudMode={cloudMode} onBack={()=>setTab("Customers")} onEdit={()=>{setEditingLead(leads.find(lead=>lead.id===customerHubId)!);setShowForm(true);}} onMeasure={()=>{setSelectedLeadId(customerHubId);setTab("Roof Measure");}} /> : <div className="card"><h2>Customer Page</h2><p>Select a customer from the Customers tab to open their page.</p><button className="btn" onClick={()=>setTab("Customers")}>Choose customer</button></div>)}
+        {tab === "Customer Page" && (customerHubId && leads.some(lead=>lead.id===customerHubId) ? <CustomerHub key={customerHubId} customer={leads.find(lead=>lead.id===customerHubId)!} userId={userId} cloudMode={cloudMode} onBack={()=>setTab("Customers")} onEdit={()=>{setEditingLead(leads.find(lead=>lead.id===customerHubId)!);setShowForm(true);}} onMeasure={()=>{setSelectedLeadId(customerHubId);setTab("Roof Measure");}} /> : <div className="card"><h2>Select a customer property</h2><p className="muted">Choose the property whose records you want to open. No customer is selected by default.</p>
+          <div className="field"><label htmlFor="customer-page-search">Search properties or customer names</label><input id="customer-page-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search address, name, email or phone" /></div>
+          <div className="tableWrap" style={{marginTop:16}}><table className="table"><thead><tr><th>Property</th><th>Customer</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          {leads.filter(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map(lead=><tr key={lead.id}><td><strong>{lead.address||"Address not provided"}</strong></td><td>{lead.name}</td><td>{lead.completed_at?"Completed":lead.status}</td><td><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);}}>Open Page</button></td></tr>)}
+          </tbody></table></div>
+          {!leads.some(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase()))&&<p className="muted" style={{marginTop:14}}>No matching customers.</p>}
+          </div>)}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} initialCustomerId={customerContext} onSelect={setCustomerContext} onOpen={setTab} />}
         {tab === "Estimates" && <EstimateBuilder initialOption={estimateOption} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Sent Estimates" && <SentEstimates customers={leads} userId={userId} cloudMode={cloudMode} onOpenCustomer={id=>{setCustomerContext(id);setEstimateOption(null);setTab("Estimates");}} />}
