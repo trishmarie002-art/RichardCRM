@@ -543,7 +543,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Weather", "Message Templates"].map((item) => (
+          {["Dashboard", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Message Templates", "Weather"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);if(item==="Customer Page"){setCustomerHubId("");setSearch("");}setTab(item);}}>
               {item}
             </button>
