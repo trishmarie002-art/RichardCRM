@@ -61,12 +61,26 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
     const maps=window.google.maps;
     const overlays:any[]=[];
     const listeners:any[]=[];
+    const segmentLabel=(from:RoofPoint,to:RoofPoint,feet:number,color:string)=>{
+      const position=maps.geometry.spherical.interpolate(from,to,0.5);
+      const marker=new maps.Marker({
+        map:map.current,position,clickable:false,zIndex:100,
+        icon:{path:maps.SymbolPath.CIRCLE,scale:0,fillOpacity:0,strokeOpacity:0},
+        label:{text:feet.toFixed(1)+" ft",color:"#ffffff",fontSize:"12px",fontWeight:"700",className:"roof-length-label"}
+      });
+      overlays.push(marker);
+    };
     const savedFacets=facets.filter(f=>f.points && f.points.length>=3);
     savedFacets.forEach((facet,index)=>{
       const color=facetColors[index%facetColors.length];
       const path=facet.points!;
       const polygonOverlay=new maps.Polygon({map:map.current,paths:path,strokeColor:color,fillColor:color,fillOpacity:.18,strokeWeight:3});
       overlays.push(polygonOverlay);
+      path.forEach((point,sideIndex)=>{
+        const next=path[(sideIndex+1)%path.length];
+        const feet=maps.geometry.spherical.computeDistanceBetween(point,next)*3.280839895;
+        if(Number.isFinite(feet)&&feet>0.1)segmentLabel(point,next,feet,color);
+      });
       const perimeter=maps.geometry.spherical.computeLength([...path,path[0]])*3.280839895;
       const label=new maps.Marker({map:map.current,position:path[0],label:{text:"F"+(index+1),color:"#111827",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:"#111827",strokeWeight:1},title:facet.name+" — outline perimeter "+perimeter.toFixed(1)+" ft"});
       overlays.push(label);
@@ -86,6 +100,7 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       const path=edge.points!;
       const overlay=new maps.Polyline({map:map.current,path,strokeColor:color,strokeWeight:4});
       overlays.push(overlay);
+      segmentLabel(path[0],path[1],edgeLength(edge),color);
       const midpoint={lat:(path[0].lat+path[1].lat)/2,lng:(path[0].lng+path[1].lng)/2};
       overlays.push(new maps.Marker({map:map.current,position:midpoint,label:{text:String(index+1),color:"#fff",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:12,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:edge.kind+" "+edgeLength(edge).toFixed(1)+" ft"}));
       path.forEach((point,vertexIndex)=>{
@@ -108,6 +123,25 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
     }
     return()=>{listeners.forEach(listener=>listener.remove());overlays.forEach(overlay=>overlay.setMap(null));};
   },[facets,edges,ready,drawing,onFacetUpdate,onEdgeUpdate]);
+
+  useEffect(()=>{
+    if(!ready||!map.current||points.length<2)return;
+    const maps=window.google?.maps;
+    if(!maps?.geometry?.spherical)return;
+    const labels:any[]=[];
+    const segments=tool==="facet"&&points.length>=3?points.length:points.length-1;
+    for(let i=0;i<segments;i++){
+      const start=points[i],end=points[(i+1)%points.length];
+      const feet=maps.geometry.spherical.computeDistanceBetween(start,end)*3.280839895;
+      if(!Number.isFinite(feet)||feet<0.1)continue;
+      labels.push(new maps.Marker({
+        map:map.current,position:maps.geometry.spherical.interpolate(start,end,0.5),clickable:false,zIndex:110,
+        icon:{path:maps.SymbolPath.CIRCLE,scale:0,fillOpacity:0,strokeOpacity:0},
+        label:{text:feet.toFixed(1)+" ft",color:"#fff",fontSize:"12px",fontWeight:"700",className:"roof-length-label"}
+      }));
+    }
+    return()=>labels.forEach(label=>label.setMap(null));
+  },[points,tool,ready]);
 
   useEffect(()=>{if(!mapReady||autoLocated.current||!address.trim())return;autoLocated.current=true;if(!facets.some(f=>f.points?.length)&&!edges.some(e=>e.points?.length))void search(address);},[mapReady,address,facets,edges]);
 
