@@ -68,7 +68,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .customerHubActions{margin:0 0 10px;gap:8px}
 .customerHubHeading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .customerHubName{font-size:27px;line-height:1.2;margin:0 0 3px;font-weight:850;color:var(--text)}
-.customerHubAddress{font-size:13px;line-height:1.45;color:var(--muted);margin:0}
+.customerHubAddress{font-size:18px;line-height:1.45;color:var(--muted);margin:0;font-weight:600}
 .customerHubStatus{white-space:nowrap}
 .customerHubQuickDetails{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
 .customerHubQuickDetails>div{min-width:0;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;background:#f5f8fb}
