@@ -14,6 +14,7 @@ const sections:Section[]=["Overview","Notes","Activity & Appointments","Photos",
 const usd=(v:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(v||0);
 export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onMeasure}:{customer:Customer;userId:string|null;cloudMode:boolean;onBack:()=>void;onEdit:()=>void;onMeasure:()=>void}){
  const [section,setSection]=useState<Section>("Overview");
+ const [showFullDetails,setShowFullDetails]=useState(false);
  // Passing only the selected customer also restricts the embedded forms to this customer.
  const onlyCustomer=[customer];
  function open(sectionName:string){
@@ -21,22 +22,37 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
   else if(sectionName==="Estimates"||sectionName==="Jobs")setSection(sectionName);
  }
  return <div>
-  <div className="card" style={{marginBottom:16}}>
-   <div className="roofToolbar"><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button><button className="mini" onClick={onMeasure}>Roof measurement</button></div>
-   <h2 style={{marginBottom:8}}>{customer.address||"Property address not entered"}</h2>
-   <p className="muted" style={{marginTop:0}}>{customer.name} · {customer.status||"No stage"}{customer.completed_at?" · Completed":""}</p>
-   <div className="roofToolbar">
-    {customer.phone&&<a className="btn secondary" href={"tel:"+customer.phone}>Call</a>}
-    {customer.email&&<a className="btn secondary" href={"mailto:"+customer.email}>Email</a>}
+  <div className="card customerHubSummary">
+   <div className="roofToolbar customerHubActions"><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button><button className="mini" onClick={onMeasure}>Roof measurement</button></div>
+   <div className="customerHubHeading">
+    <div>
+     <h2 className="customerHubName">{customer.name||"Unnamed customer"}</h2>
+     <p className="customerHubAddress">{customer.address||"Property address not entered"}</p>
+    </div>
+    <span className="badge customerHubStatus">{customer.status||"No stage"}{customer.completed_at?" · Completed":""}</span>
    </div>
-   <div className="grid" style={{marginTop:14}}>
-    <div className="kpi"><span>Phone</span><strong>{customer.phone||"Not provided"}</strong></div>
-    <div className="kpi"><span>Email</span><strong style={{overflowWrap:"anywhere"}}>{customer.email||"Not provided"}</strong></div>
-    <div className="kpi"><span>Job type</span><strong>{customer.job_type||"Not set"}</strong></div><div className="kpi"><span>Salesperson</span><strong>{customer.salesperson||"Unassigned"}</strong></div><div className="kpi"><span>Lead source</span><strong>{customer.source||"Other"}</strong></div><div className="kpi"><span>Lead created</span><strong>{customer.created_at?new Date(customer.created_at).toLocaleDateString():"Not recorded"}</strong></div>
-    <div className="kpi"><span>Potential value</span><strong>{usd(customer.value)}</strong></div>
+   <div className="customerHubQuickDetails">
+    <div><span>Phone</span><strong>{customer.phone||"Not provided"}</strong></div>
+    <div><span>Email</span><strong>{customer.email||"Not provided"}</strong></div>
+    <div><span>Job type</span><strong>{customer.job_type||"Not set"}</strong></div>
+    <div><span>Salesperson</span><strong>{customer.salesperson||"Unassigned"}</strong></div>
    </div>
-   {customer.notes&&<p style={{whiteSpace:"pre-wrap"}}><strong>Original lead notes:</strong> {customer.notes}</p>}
-   {!!customer.additional_contacts?.length&&<div><h3>Additional contacts</h3>{customer.additional_contacts.map((person,index)=><div className="kpi" key={index}><span>{person.role||"Additional contact"}: {person.name||"Name not provided"}</span><strong>{person.phone||""} {person.email||""}</strong></div>)}</div>}
+   <div className="customerHubBottomActions">
+    <div className="roofToolbar">
+     {customer.phone&&<a className="btn secondary" href={"tel:"+customer.phone}>Call</a>}
+     {customer.email&&<a className="btn secondary" href={"mailto:"+customer.email}>Email</a>}
+    </div>
+    <button className="mini" type="button" aria-expanded={showFullDetails} onClick={()=>setShowFullDetails(v=>!v)}>{showFullDetails?"Hide extra details ▲":"More customer details ▼"}</button>
+   </div>
+   {showFullDetails&&<div className="customerHubExpanded">
+    <div className="customerHubQuickDetails">
+     <div><span>Lead source</span><strong>{customer.source||"Other"}</strong></div>
+     <div><span>Lead created</span><strong>{customer.created_at?new Date(customer.created_at).toLocaleDateString():"Not recorded"}</strong></div>
+     <div><span>Potential value</span><strong>{usd(customer.value)}</strong></div>
+    </div>
+    {customer.notes&&<p style={{whiteSpace:"pre-wrap",marginTop:12}}><strong>Original lead notes:</strong> {customer.notes}</p>}
+    {!!customer.additional_contacts?.length&&<div><h3>Additional contacts</h3>{customer.additional_contacts.map((person,index)=><div className="kpi" key={index}><span>{person.role||"Additional contact"}: {person.name||"Name not provided"}</span><strong>{person.phone||""} {person.email||""}</strong></div>)}</div>}
+   </div>}
   </div>
   <div className="roofToolbar" role="group" aria-label="Customer page sections" style={{marginBottom:16}}>
    {sections.map(item=><button key={item} type="button" className={section===item?"btn":"btn secondary"} aria-pressed={section===item} onClick={()=>setSection(item)}>{item}</button>)}
