@@ -42,20 +42,38 @@ export default function RoofReport({customer,sections,edges,waste}:{customer?:{n
   const kinds=["ridge","hip","valley","eave","rake"] as const;
   const mapImage=roofMapImage(sections,edges);
   const [mapImageFailed,setMapImageFailed]=useState(false);
+  const [printing,setPrinting]=useState(false);
   function print() {
+    setError("");
+    if(!report.current){setError("Roof report is not ready.");return;}
+    if(!mapImage){
+      setError("No traced roof image is available. Trace and save a roof outline or edge on the satellite map before printing.");
+      return;
+    }
+    const source=report.current.querySelector<HTMLImageElement>(".roofReportMap");
+    if(!source||!source.complete||source.naturalWidth===0||mapImageFailed){
+      setError("The satellite measurement image has not loaded. Check Google Maps Static API access and try again. The printout will not omit the roof image.");
+      return;
+    }
     const popup=window.open("","_blank");
-    if(!popup || !report.current){setError("Allow popups to print the roof report.");return;}
+    if(!popup){setError("Allow popups to print the roof report.");return;}
     popup.opener=null;
+    setPrinting(true);
     popup.document.write("<!doctype html><html><head><title>Roof measurement report</title><style>body{font:15px system-ui;color:#162333;margin:30px}h1{border-bottom:3px solid #df971e;padding-bottom:15px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{text-align:left;border-bottom:1px solid #ccc;padding:9px}p{line-height:1.5}h2{margin-top:30px}.roofReportMap{width:100%;max-width:680px;height:auto;border:1px solid #cbd5e1;display:block}.roofReportMapBlock{break-inside:avoid;page-break-inside:avoid}@media print{body{margin:14mm}.roofReportMap{max-width:100%}}</style></head><body>"+report.current.innerHTML+"</body></html>");
     popup.document.close();
-    popup.focus();
-    // Wait for the satellite image to finish loading before opening the print/PDF dialog.
-    const imgs=Array.from(popup.document.images);
-    if(!imgs.length){popup.print();return;}
-    Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise<void>(resolve=>{
-     img.addEventListener("load",()=>resolve(),{once:true});
-     img.addEventListener("error",()=>resolve(),{once:true});
-    }))).then(()=>{if(!popup.closed)popup.print();});
+    const image=popup.document.querySelector<HTMLImageElement>(".roofReportMap");
+    if(!image){popup.close();setPrinting(false);setError("Roof image was missing from the print page. Nothing printed.");return;}
+    const finish=()=>{
+      setPrinting(false);
+      if(!popup.closed) {popup.focus();popup.print();}
+    };
+    if(image.complete){
+      if(image.naturalWidth>0)finish();
+      else{popup.close();setPrinting(false);setError("Roof image failed to load in the PDF/print window. Nothing printed.");}
+    }else{
+      image.addEventListener("load",finish,{once:true});
+      image.addEventListener("error",()=>{popup.close();setPrinting(false);setError("Roof image failed to load in the PDF/print window. Nothing printed.");},{once:true});
+    }
   }
   return <div className="card" style={{marginTop:16}}>
     <div ref={report}>
@@ -80,7 +98,7 @@ export default function RoofReport({customer,sections,edges,waste}:{customer?:{n
       <p>{kinds.map(kind=>kind+": "+edges.filter(edge=>edge.kind===kind).reduce((sum,edge)=>sum+edgeLength(edge),0).toFixed(1)+" ft").join(" · ")}</p>
       <p>Edge lengths assume a straight segment between endpoints. A zero height difference produces horizontal distance only; roof pitch alone cannot establish hip or valley length. Height differences must be measured. Do not count shared roof edges twice.</p>
     </div>
-    <button className="btn secondary" disabled={!customer || !sections.length} onClick={print}>Print roof report / save PDF</button>
+    <button className="btn secondary" disabled={!customer || !sections.length || printing} onClick={print}>{printing?"Preparing roof image…":"Print roof report / save PDF"}</button>
     {error && <p role="status" className="notice">{error}</p>}
   </div>;
 }
