@@ -85,7 +85,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .customerHubExpanded .kpi{font-size:16px}.customerHubExpanded .kpi strong{font-size:17px;overflow-wrap:anywhere}
 
 /* Customer photo detail zoom and pan viewer. */
-.customerPhotoViewport{width:100%;height:min(65vh,660px);overflow:auto;border:1px solid var(--line);border-radius:10px;background:#e8edf3;cursor:grab;touch-action:pan-x pan-y;overscroll-behavior:contain}
+.customerPhotoViewport{width:100%;height:min(65vh,660px);overflow:auto;border:1px solid var(--line);border-radius:10px;background:#e8edf3;cursor:grab;touch-action:none;overscroll-behavior:contain}
 .customerPhotoViewport:active{cursor:grabbing}
 .customerPhotoViewport img{pointer-events:none}
 @media(max-width:600px){.customerPhotoViewport{height:55vh}}
