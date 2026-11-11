@@ -34,6 +34,8 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
   const [drawing, setDrawing] = useState(false);
   const [pitch, setPitch] = useState<number|null>(null);
   const [mapReady,setMapReady]=useState(false);
+  const [mapZoom,setMapZoom]=useState(19);
+  function adjustZoom(delta:number){if(!map.current)return;const next=Math.min(23,Math.max(1,(map.current.getZoom()??mapZoom)+delta));map.current.setZoom(next);setMapZoom(next);}
   const [authFailed,setAuthFailed]=useState(false);
   const autoLocated=useRef(false);
   const [message, setMessage] = useState("");
@@ -47,11 +49,13 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
     if (!ready || !container.current) return;
     const maps = window.google?.maps;
     if(!maps?.Map||!maps?.geometry?.spherical){setMessage("Google Maps did not initialize correctly. Reload the page and check the API setup.");return;}
-    map.current = new maps.Map(container.current, { center: { lat: 29.4241, lng: -98.4936 }, zoom: 19, mapTypeId: "satellite", tilt: 0, heading: 0, gestureHandling:"greedy", streetViewControl: false, rotateControl: false });
+    map.current = new maps.Map(container.current, { center: { lat: 29.4241, lng: -98.4936 }, zoom: 20, maxZoom: 23, zoomControl:true, zoomControlOptions:{position:maps.ControlPosition.RIGHT_CENTER}, mapTypeId: "satellite", tilt: 0, heading: 0, gestureHandling:"greedy", streetViewControl: false, rotateControl: false });
     polygon.current = new maps.Polygon({ map: map.current, strokeColor: "#ff9f1c", fillColor: "#ff9f1c", fillOpacity: 0.25 });
     line.current = new maps.Polyline({ map:map.current,strokeColor:"#60a5fa",strokeWeight:4 });
+    setMapZoom(map.current.getZoom()??20);
+    const zoomListener=map.current.addListener("zoom_changed",()=>setMapZoom(map.current?.getZoom()??20));
     setMapReady(true);
-    return () => { setMapReady(false);line.current.setMap(null); maps.event.clearInstanceListeners(map.current); polygon.current.setMap(null); map.current = null; };
+    return () => { zoomListener.remove();setMapReady(false);line.current.setMap(null); maps.event.clearInstanceListeners(map.current); polygon.current.setMap(null); map.current = null; };
   }, [ready]);
 
   useEffect(() => {
@@ -201,7 +205,13 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       <button className="btn" disabled={!mapReady || authFailed || searching}>{searching ? "Finding…" : "Find roof"}</button>
     </form>
     <div className="roofToolbar" aria-label="Roof measuring line color key" style={{gap:8,alignItems:"center",marginTop:10,marginBottom:6}}><strong style={{fontSize:13,marginRight:4}}>Line colors:</strong>{([{name:"Roof facet",color:facetColors[0]},...(["ridge","hip","valley","eave","rake"] as const).map(kind=>({name:kind[0].toUpperCase()+kind.slice(1),color:edgeColors[kind]}))]).map(item=><span key={item.name} style={{display:"inline-flex",alignItems:"center",gap:6,padding:"5px 9px",border:"1px solid #d8e2ed",borderRadius:8,fontSize:12,background:"#fff",color:"#17283d"}}><span aria-hidden="true" style={{width:13,height:13,background:item.color,borderRadius:3,border:"1px solid #64748b"}}/>{item.name}</span>)}</div>
-    <div ref={container} className="roofMap" aria-label="Satellite map for roof tracing" />
+    <div className="roofToolbar" style={{alignItems:"center",gap:8,margin:"8px 0"}} aria-label="Roof satellite zoom controls">
+       <strong style={{fontSize:13}}>Satellite zoom: {mapZoom}</strong>
+       <button type="button" className="mini" disabled={!mapReady||mapZoom<=1} onClick={()=>adjustZoom(-1)}>− Zoom out</button>
+       <button type="button" className="mini" disabled={!mapReady||mapZoom>=23} onClick={()=>adjustZoom(1)}>+ Zoom in closer</button>
+       <span className="small muted">Zoom up to level 23 where satellite imagery supports it. Some locations may become blurry at higher zoom.</span>
+     </div>
+     <div ref={container} className="roofMap" aria-label="Satellite map for roof tracing" />
     <div className="roofToolbar">
       <div className="field"><label htmlFor="roof-tool">Trace tool — colors match the map</label><div style={{display:"flex",alignItems:"center",gap:9}}><span aria-hidden="true" style={{width:17,height:17,flexShrink:0,borderRadius:4,background:tool==="facet"?facetColors[0]:edgeColors[tool],border:"1px solid #64748b"}}/><select id="roof-tool" aria-label="Color-coded roof measurement tool" value={tool} onChange={event=>switchTool(event.target.value as typeof tool)} style={{borderLeft:"6px solid "+(tool==="facet"?facetColors[0]:edgeColors[tool])}}><option value="facet" style={{background:facetColors[0],color:"#111827"}}>🟡 Roof facet</option>{(["ridge","hip","valley","eave","rake"] as const).map(kind=><option key={kind} value={kind} style={{background:edgeColors[kind],color:kind==="eave"||kind==="rake"?"#102437":"#fff"}}>{({ridge:"🔴 Ridge",hip:"🟠 Hip",valley:"🟣 Valley",eave:"🟢 Eave",rake:"🔵 Rake"} as const)[kind]}</option>)}</select></div></div>
       {tool!=="facet" && <div className="field"><label htmlFor="edge-rise">Endpoint height difference (ft)</label><input id="edge-rise" type="number" min="0" step="0.1" value={rise} onChange={event=>setRise(Number(event.target.value))}/></div>}
