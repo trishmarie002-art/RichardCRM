@@ -24,13 +24,29 @@ function roofMapImage(sections:Section[],edges:RoofEdge[]){
   paths.push("color:"+edgeColors[edge.kind]+"|weight:5|"+points.map(p=>p.lat.toFixed(7)+","+p.lng.toFixed(7)).join("|"));
  });
  if(!located.length)return "";
+ // Center and zoom explicitly on the actual measured roof. Without center/zoom,
+ // Static Maps auto-fits a broad area and roof annotations become tiny in the PDF.
+ const minLat=Math.min(...located.map(p=>p.lat));
+ const maxLat=Math.max(...located.map(p=>p.lat));
+ const minLng=Math.min(...located.map(p=>p.lng));
+ const maxLng=Math.max(...located.map(p=>p.lng));
+ const centerLat=(minLat+maxLat)/2,centerLng=(minLng+maxLng)/2;
+ const mercatorY=(lat:number)=>Math.log(Math.tan(Math.PI/4+Math.max(-85,Math.min(85,lat))*Math.PI/360));
+ const spanX=Math.max((maxLng-minLng)/360,1/10000000);
+ const spanY=Math.max((mercatorY(maxLat)-mercatorY(minLat))/(2*Math.PI),1/10000000);
+ // Keep all the roof geometry visible with room for the colored tracing lines.
+ // 640x480 is the logical Maps API image size; scale=2 yields 1280x960 print pixels.
+ const fitX=Math.log2((640*0.72)/(256*spanX));
+ const fitY=Math.log2((480*0.72)/(256*spanY));
+ const zoom=Math.max(18,Math.min(22,Math.floor(Math.min(fitX,fitY))));
  const url=new URL("https://maps.googleapis.com/maps/api/staticmap");
- url.searchParams.set("size","640x420");
+ url.searchParams.set("size","640x480");
  url.searchParams.set("scale","2");
+ url.searchParams.set("center",centerLat.toFixed(7)+","+centerLng.toFixed(7));
+ url.searchParams.set("zoom",String(zoom));
  url.searchParams.set("maptype","satellite");
  url.searchParams.set("format","png");
  url.searchParams.set("key",key);
- // Let Google fit the image to the full measurement geometry.
  paths.forEach(path=>url.searchParams.append("path",path));
  return url.toString().length<8000?url.toString():"";
 }
@@ -84,7 +100,7 @@ export default function RoofReport({customer,sections,edges,waste}:{customer?:{n
         <h2>Satellite roof measurement image</h2>
         {mapImage&&!mapImageFailed?
          <><img className="roofReportMap" src={mapImage} alt="Satellite view of roof showing traced measurement facets and edge lines" onError={()=>setMapImageFailed(true)}/>
-           <p>Satellite view with saved and current traced roof outlines and edges. Colored lines distinguish measurement types; measured footage is listed in the tables below.</p></>:
+           <p>Close-up satellite view centered on this property’s traced roof. Colored lines identify the roof facets and edges; corresponding measurements are listed below.</p></>:
          <p>Map image unavailable. Google Maps Static API must be enabled for the same Maps key, and roof outlines or edges must be traced on the satellite map. Measurement totals remain available below.</p>}
       </div>
       <h2>Roof facets</h2><div className="tableWrap"><table className="table"><thead><tr><th>Facet</th><th>Footprint sq ft</th><th>Pitch</th><th>Surface sq ft</th></tr></thead><tbody>
