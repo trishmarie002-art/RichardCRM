@@ -506,7 +506,7 @@ export default function Home() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <div className="logo">Star Roofing <span>CRM</span></div>
+        <div className="sidebarBrand"><img src="https://starroofingtx.com/wp-content/uploads/2024/09/2021-01-29__1_-removebg-preview.png" alt="Star Roofing" width={206} height={101} style={{maxWidth:"100%",height:"auto",objectFit:"contain"}}/><span className="sidebarCrmLabel">CRM</span></div>
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
