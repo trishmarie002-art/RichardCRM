@@ -98,3 +98,12 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .customerPhotoNavigator img{display:block;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
 .customerPhotoNavigatorRegion{position:absolute;box-sizing:border-box;border:2px solid #facc15;background:rgba(250,204,21,.22);box-shadow:0 0 0 1px rgba(0,0,0,.6);pointer-events:none}
 @media(max-width:600px){.customerPhotoNavigatorWrap{right:8px;bottom:8px;padding:6px}}
+
+/* Full-page image inspection retains the same zoom and navigator controls. */
+.customerPhotoFullscreen{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;min-height:0;padding:12px 20px;background:#f7f9fc;box-sizing:border-box;overflow:hidden}
+.customerPhotoFullscreen .customerPhotoStage{flex:1;min-height:0;display:flex;flex-direction:column}
+.customerPhotoFullscreen .customerPhotoViewport{flex:1;min-height:0;height:auto;max-height:none}
+.customerPhotoFullscreen .customerPhotoNavigatorWrap{right:22px;bottom:22px}
+.customerPhotoFullscreen>.roofToolbar{flex-shrink:0}
+.customerPhotoFullscreen>.small{flex-shrink:0;margin:8px 0}
+@media(max-width:600px){.customerPhotoFullscreen{padding:8px}.customerPhotoFullscreen .customerPhotoNavigatorWrap{right:8px;bottom:8px}}
