@@ -35,7 +35,7 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
   const [pitch, setPitch] = useState<number|null>(null);
   const [mapReady,setMapReady]=useState(false);
   const [mapZoom,setMapZoom]=useState(19);
-  function adjustZoom(delta:number){if(!map.current)return;const next=Math.min(23,Math.max(1,(map.current.getZoom()??mapZoom)+delta));map.current.setZoom(next);setMapZoom(next);}
+  function adjustZoom(delta:number){if(!map.current)return;const next=Math.min(25,Math.max(1,(map.current.getZoom()??mapZoom)+delta));map.current.setZoom(next);setMapZoom(next);}
   const [authFailed,setAuthFailed]=useState(false);
   const autoLocated=useRef(false);
   const [message, setMessage] = useState("");
@@ -49,7 +49,7 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
     if (!ready || !container.current) return;
     const maps = window.google?.maps;
     if(!maps?.Map||!maps?.geometry?.spherical){setMessage("Google Maps did not initialize correctly. Reload the page and check the API setup.");return;}
-    map.current = new maps.Map(container.current, { center: { lat: 29.4241, lng: -98.4936 }, zoom: 20, maxZoom: 23, zoomControl:true, zoomControlOptions:{position:maps.ControlPosition.RIGHT_CENTER}, mapTypeId: "satellite", tilt: 0, heading: 0, gestureHandling:"greedy", streetViewControl: false, rotateControl: false });
+    map.current = new maps.Map(container.current, { center: { lat: 29.4241, lng: -98.4936 }, zoom: 20, maxZoom: 25, zoomControl:true, zoomControlOptions:{position:maps.ControlPosition.RIGHT_CENTER}, mapTypeId: "satellite", tilt: 0, heading: 0, gestureHandling:"greedy", streetViewControl: false, rotateControl: false });
     polygon.current = new maps.Polygon({ map: map.current, strokeColor: "#ff9f1c", fillColor: "#ff9f1c", fillOpacity: 0.25 });
     line.current = new maps.Polyline({ map:map.current,strokeColor:"#60a5fa",strokeWeight:4 });
     setMapZoom(map.current.getZoom()??20);
@@ -208,8 +208,8 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
     <div className="roofToolbar" style={{alignItems:"center",gap:8,margin:"8px 0"}} aria-label="Roof satellite zoom controls">
        <strong style={{fontSize:13}}>Satellite zoom: {mapZoom}</strong>
        <button type="button" className="mini" disabled={!mapReady||mapZoom<=1} onClick={()=>adjustZoom(-1)}>− Zoom out</button>
-       <button type="button" className="mini" disabled={!mapReady||mapZoom>=23} onClick={()=>adjustZoom(1)}>+ Zoom in closer</button>
-       <span className="small muted">Zoom up to level 23 where satellite imagery supports it. Some locations may become blurry at higher zoom.</span>
+       <button type="button" className="mini" disabled={!mapReady||mapZoom>=25} onClick={()=>adjustZoom(1)}>+ Zoom in closer</button>
+       <span className="small muted">Allows map zoom up to level 25, but the actual detail is limited by Google's satellite imagery for this address. Higher levels may enlarge pixels without revealing more detail.</span>
      </div>
      <div ref={container} className="roofMap" aria-label="Satellite map for roof tracing" />
     <div className="roofToolbar">
