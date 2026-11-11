@@ -415,6 +415,38 @@ export default function Home() {
     setSections((current) => current.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
+  async function deleteMeasurement() {
+    const id=editingMeasurementId;
+    if(!selectedLeadId||!id||syncing)return;
+    const record=savedMeasurements.find(item=>item.id===id);
+    if(!record)return;
+    if(!window.confirm("Permanently delete the entire saved roof measurement from "+new Date(record.created_at).toLocaleString()+"? All roof facets, edges and lines in this measurement will be removed. This cannot be undone."))return;
+    setSyncing(true);
+    setMeasurementMessage("");
+    try{
+      if(cloudMode){
+        if(!supabase||!userId)throw new Error("Sign in to delete roof measurements.");
+        const {data,error}=await supabase.from("roof_measurements").delete()
+          .eq("id",id).eq("lead_id",selectedLeadId).eq("user_id",userId)
+          .select("id");
+        if(error)throw error;
+        if(!data?.length)throw new Error("Measurement was not deleted. Check your access and try again.");
+      }else{
+        localStorage.removeItem("richardcrm.measurements.local."+selectedLeadId);
+      }
+      const remaining=savedMeasurements.filter(item=>item.id!==id);
+      setSavedMeasurements(remaining);
+      setEditingMeasurementId("");
+      setSections([]);
+      setEdges([]);
+      setWaste(10);
+      setMeasurementRevision(value=>value+1);
+      setMeasurementMessage("Saved measurement permanently deleted. You can start a new measurement or choose another saved record.");
+    }catch(error){
+      setMeasurementMessage(error instanceof Error?error.message:"Could not delete measurement.");
+    }finally{setSyncing(false);}
+  }
+
   async function saveMeasurement() {
     const lead = leads.find(item => item.id === selectedLeadId);
     if (!lead || !sections.length) {
@@ -680,7 +712,12 @@ export default function Home() {
             }}>
               <option value="">+ Start a new measurement</option>
               {savedMeasurements.map((record,index)=><option key={record.id} value={record.id}>{new Date(record.created_at).toLocaleString()}{index===0?" (latest)":""}</option>)}
-            </select></div><p className="small muted">Selecting an existing measurement loads its roof sections, mapped outlines, edge lengths, and waste factor. Saving updates that record, rather than creating a duplicate.</p></>:<p className="muted">No saved measurement yet. Trace the roof or add measurements manually, then save.</p>}
+            </select></div>
+            <div className="roofToolbar" style={{marginTop:10}}>
+              <button type="button" className="mini" disabled={syncing||!editingMeasurementId} onClick={()=>void deleteMeasurement()} style={{color:"#b42318",borderColor:"#b42318"}}>Delete Entire Measurement</button>
+              <span className="small muted">Deletes only the selected saved measurement, not the customer or other saved measurements.</span>
+            </div>
+            <p className="small muted">Selecting an existing measurement loads its roof sections, mapped outlines, edge lengths, and waste factor. Saving updates that record, rather than creating a duplicate.</p></>:<p className="muted">No saved measurement yet. Trace the roof or add measurements manually, then save.</p>}
             {measurementMessage&&<p className="notice" role="status">{measurementMessage}</p>}
           </div>}
           {selectedLeadId && measurementReady ? <RoofMap facets={sections} edges={edges} onFacetUpdate={updateFacetGeometry} onEdgeUpdate={updateEdgeGeometry} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId+"-"+measurementRevision} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
