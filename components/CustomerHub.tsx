@@ -23,7 +23,7 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
  }
  return <div>
   <div className="card customerHubSummary">
-   <div className="roofToolbar customerHubActions"><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button><button className="mini" onClick={onMeasure}>Roof measurement</button></div>
+   <div className="roofToolbar customerHubActions"><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button></div>
    <div className="customerHubHeading">
     <div>
      <h2 className="customerHubName">{customer.name||"Unnamed customer"}</h2>
@@ -56,6 +56,7 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
   </div>
   <div className="roofToolbar" role="group" aria-label="Customer page sections" style={{marginBottom:16}}>
    {sections.map(item=><button key={item} type="button" className={section===item?"btn":"btn secondary"} aria-pressed={section===item} onClick={()=>setSection(item)}>{item}</button>)}
+   <button type="button" className="btn secondary" onClick={onMeasure}>Roof Measurements</button>
   </div>
   {section==="Overview"&&<CustomerOverview key={customer.id} customerId={customer.id} userId={userId} onOpen={open}/>}
   {section==="Notes"&&<CustomerNotes key={customer.id} customerId={customer.id} userId={userId}/>}
