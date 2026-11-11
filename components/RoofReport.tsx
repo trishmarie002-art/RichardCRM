@@ -50,102 +50,6 @@ function roofMapImage(sections:Section[],edges:RoofEdge[]){
  paths.forEach(path=>url.searchParams.append("path",path));
  return url.toString().length<8000?url.toString():"";
 }
-// Project the measured plan into a consistent isometric view.
-// Each polygon is shown as a single roof plane rather than inventing a pyramidal apex.
-// True ridge elevations cannot be reconstructed from 2D tracing and pitch alone.
-function RoofPerspective({sections,edges}:{sections:Section[];edges:RoofEdge[]}){
- const facets=sections.filter(section=>(section.points||[]).length>=3&&section.points!.every(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)));
- if(!facets.length)return null;
- type P={x:number;y:number};type P3=P&{z:number};
- const points=facets.flatMap(section=>section.points!);
- const lat0=points.reduce((sum,p)=>sum+p.lat,0)/points.length;
- const lng0=points.reduce((sum,p)=>sum+p.lng,0)/points.length;
- const cosLat=Math.cos(lat0*Math.PI/180);
- const local=(p:GeoPoint):P=>({x:(p.lng-lng0)*364000*cosLat,y:(lat0-p.lat)*364000});
- const all=points.map(local);
- const minX=Math.min(...all.map(p=>p.x)),maxX=Math.max(...all.map(p=>p.x));
- const minY=Math.min(...all.map(p=>p.y)),maxY=Math.max(...all.map(p=>p.y));
- const span=Math.max(12,maxX-minX,maxY-minY);
- const ridgeEdges=edges.filter(e=>e.kind==="ridge"&&e.points?.length===2).map(e=>({a:local(e.points![0]),b:local(e.points![1])}));
- const roofFaces=facets.map((section,index)=>{
-  const plan=section.points!.map(local);
-  const cx=plan.reduce((sum,p)=>sum+p.x,0)/plan.length;
-  const cy=plan.reduce((sum,p)=>sum+p.y,0)/plan.length;
-  const longest=plan.reduce((best,p,i)=>{
-   const q=plan[(i+1)%plan.length],len=Math.hypot(q.x-p.x,q.y-p.y);
-   return len>best.len?{len,dx:q.x-p.x,dy:q.y-p.y}:best;
-  },{len:0,dx:1,dy:0});
-  // Prefer the closest user-traced ridge as a direction guide, never infer a new ridge.
-  const nearest=ridgeEdges.map(edge=>{
-   const dx=edge.b.x-edge.a.x,dy=edge.b.y-edge.a.y,len=Math.max(0.01,Math.hypot(dx,dy));
-   const dist=Math.abs((cx-edge.a.x)*dy-(cy-edge.a.y)*dx)/len;
-   return {...edge,dx,dy,len,dist};
-  }).sort((u,v)=>u.dist-v.dist)[0];
-  const along=nearest&&nearest.dist<span*.28?{x:nearest.dx,y:nearest.dy}:{x:longest.dx,y:longest.dy};
-  const length=Math.max(.01,Math.hypot(along.x,along.y));
-  const nx=-along.y/length,ny=along.x/length;
-  const values=plan.map(p=>p.x*nx+p.y*ny);
-  const lo=Math.min(...values),hi=Math.max(...values),run=Math.max(1,hi-lo);
-  const pitch=Math.max(0,Math.min(12,section.pitch));
-  const rise=Math.min(11,run*pitch/12);
-  // Height is schematic. Facets keep planar surfaces rather than converging to fake peaks.
-  const vertices:P3[]=plan.map((p,i)=>({...p,z:6+rise*(values[i]-lo)/run}));
-  return {section,index,vertices,depth:cx+cy,pitch,center:{x:cx,y:cy},rise};
- }).sort((u,v)=>u.depth-v.depth);
- const iso=(p:P3)=>({x:380+(p.x-p.y)*.84,y:230+(p.x+p.y)*.42-p.z*1.35});
- const projected=roofFaces.flatMap(f=>[...f.vertices,...f.vertices.map(v=>({...v,z:-2}))].map(iso));
- const pxMin=Math.min(...projected.map(p=>p.x)),pxMax=Math.max(...projected.map(p=>p.x));
- const pyMin=Math.min(...projected.map(p=>p.y)),pyMax=Math.max(...projected.map(p=>p.y));
- // Scale to fit the available illustration area. The old 1.9 cap made real roofs microscopic.
- const factor=Math.min(600/Math.max(1,pxMax-pxMin),258/Math.max(1,pyMax-pyMin));
- const offsetX=360-factor*(pxMin+pxMax)/2,offsetY=196-factor*(pyMin+pyMax)/2;
- const screen=(p:P3)=>{const q=iso(p);return {x:q.x*factor+offsetX,y:q.y*factor+offsetY};};
- const poly=(arr:P3[])=>arr.map(p=>{const q=screen(p);return q.x.toFixed(1)+","+q.y.toFixed(1);}).join(" ");
- const roofColors=["#859cad","#9caeac","#c6a892","#a6a3b9","#a4b2a3","#bbadb0"];
- const edgeColors:Record<RoofEdge["kind"],string>={ridge:"#c23939",hip:"#d28d22",valley:"#8b55b0",eave:"#278d60",rake:"#2185ac"};
- const featureEdges=edges.filter(e=>e.points?.length===2&&e.points.every(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)));
- return <div className="roof3dBlock">
-  <h2>Roof perspective — traced geometry</h2>
-  <svg className="roof3dPreview" viewBox="0 0 720 430" role="img" aria-label="Isometric roof-plane visualization using traced roof facets and labeled edges" xmlns="http://www.w3.org/2000/svg">
-   <defs>
-    <linearGradient id="roof-report-sky" x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stopColor="#f8fafc"/><stop offset="1" stopColor="#e7eef5"/></linearGradient>
-    <pattern id="roof-report-grid" width="22" height="22" patternUnits="userSpaceOnUse"><path d="M 22 0 L 0 0 0 22" fill="none" stroke="#b6c6d4" strokeWidth=".55" opacity=".44"/></pattern>
-    <filter id="roof-report-shadow"><feGaussianBlur stdDeviation="8"/></filter>
-   </defs>
-   <rect width="720" height="430" rx="12" fill="url(#roof-report-sky)"/>
-   <rect x="10" y="12" width="700" height="352" rx="8" fill="url(#roof-report-grid)" opacity=".35"/>
-   <ellipse cx="360" cy="307" rx="232" ry="38" fill="#53677d" opacity=".10" filter="url(#roof-report-shadow)"/>
-   {roofFaces.map(face=>{
-    const n=face.vertices.length;
-    const walls=face.vertices.map((v,i)=>{
-     const next=face.vertices[(i+1)%n];
-     return {i,depth:v.x+v.y+next.x+next.y,quad:[v,next,{...next,z:-2},{...v,z:-2}]};
-    }).sort((x,y)=>x.depth-y.depth);
-    const textPosition=screen({...face.center,z:6+face.rise*.5});
-    return <g key={face.section.id}>
-     {walls.map(w=><polygon key={w.i} points={poly(w.quad)} fill={w.i%2===0?"#d0d9e3":"#aab8c7"} stroke="#66788b" strokeWidth="1.1" strokeLinejoin="round"/>)}
-     <polygon points={poly(face.vertices)} fill={roofColors[face.index%roofColors.length]} stroke="#30485f" strokeWidth="2.3" strokeLinejoin="round"/>
-     <polygon points={poly(face.vertices)} fill="#fff" fillOpacity=".13" stroke="none"/>
-     <circle cx={textPosition.x} cy={textPosition.y} r="10" fill="#fff" fillOpacity=".95" stroke="#334155" strokeWidth=".8"/>
-     <text x={textPosition.x} y={textPosition.y+3.5} textAnchor="middle" fontSize="10" fontWeight="700" fill="#1d3b52">{face.index+1}</text>
-    </g>;
-   })}
-   {featureEdges.map(edge=>{
-    const a=local(edge.points![0]),b=local(edge.points![1]);
-    const q1=screen({...a,z:7}),q2=screen({...b,z:7});
-    return <g key={edge.id}><line x1={q1.x} y1={q1.y} x2={q2.x} y2={q2.y} stroke="#f8fafc" strokeWidth="4" strokeLinecap="round"/><line x1={q1.x} y1={q1.y} x2={q2.x} y2={q2.y} stroke={edgeColors[edge.kind]} strokeWidth="2.4" strokeLinecap="round"/></g>;
-   })}
-   <rect x="18" y="17" width="236" height="37" rx="7" fill="#fff" fillOpacity=".96" stroke="#d5dfe8"/>
-   <text x="31" y="33" fontSize="12" fontWeight="700" fill="#21394d">ROOF GEOMETRY PREVIEW</text>
-   <text x="31" y="46" fontSize="10" fill="#687f94">Traced sections · not survey-grade 3D</text>
-   <g transform="translate(650 30)"><circle r="23" fill="#fff" stroke="#becbd8"/><path d="M0 15 V-13 M-5 -3 L0 -13 L5 -3" stroke="#456079" strokeWidth="2" fill="none"/><text y="-17" textAnchor="middle" fontSize="10" fontWeight="700" fill="#334155">N</text></g>
-   <rect x="18" y="366" width="684" height="47" rx="7" fill="#fff" fillOpacity=".95" stroke="#d6e0e9"/>
-   {(["ridge","hip","valley","eave","rake"] as const).map((kind,i)=><g key={kind} transform={`translate(${30+i*132} 385)`}><line x1="0" y1="0" x2="21" y2="0" stroke={edgeColors[kind]} strokeWidth="4" strokeLinecap="round"/><text x="28" y="4" fontSize="12" fill="#34465a">{kind.charAt(0).toUpperCase()+kind.slice(1)}</text></g>)}
-   <text x="30" y="402" fontSize="10.5" fill="#64748b">Facet numbers correspond to the measurement table below · elevations conceptual</text>
-  </svg>
-  <p>Enlarged isometric roof plan showing traced boundaries and conceptual slopes based on entered pitch. Roof elevation, ridge connections and wall heights are not measured. Use the satellite image and measurement tables for estimating.</p>
- </div>;
-}
 export default function RoofReport({customer,sections,edges,waste}:{customer?:{name:string;address:string};sections:Section[];edges:RoofEdge[];waste:number}) {
   const report=useRef<HTMLDivElement>(null);
   const [error,setError]=useState("");
@@ -171,7 +75,7 @@ export default function RoofReport({customer,sections,edges,waste}:{customer?:{n
     if(!popup){setError("Allow popups to print the roof report.");return;}
     popup.opener=null;
     setPrinting(true);
-    popup.document.write("<!doctype html><html><head><title>Roof measurement report</title><style>body{font:15px system-ui;color:#162333;margin:30px}h1{border-bottom:3px solid #df971e;padding-bottom:15px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{text-align:left;border-bottom:1px solid #ccc;padding:9px}p{line-height:1.5}h2{margin-top:30px}.roofReportMap{width:100%;max-width:420px;height:auto;border:1px solid #cbd5e1;display:block;margin:10px auto}.roofReportMapBlock{break-inside:avoid;page-break-inside:avoid}@media print{body{margin:14mm}.roofReportMap{width:110mm;max-width:100%;height:auto;margin:8px auto}.roofReportMapBlock h2{margin-top:18px}.roof3dPreview{display:block;width:110mm;max-width:100%;height:auto;margin:8px auto}.roof3dBlock{break-inside:avoid;page-break-inside:avoid}.roof3dBlock h2{margin-top:18px}}</style></head><body>"+report.current.innerHTML+"</body></html>");
+    popup.document.write("<!doctype html><html><head><title>Roof measurement report</title><style>body{font:15px system-ui;color:#162333;margin:30px}h1{border-bottom:3px solid #df971e;padding-bottom:15px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{text-align:left;border-bottom:1px solid #ccc;padding:9px}p{line-height:1.5}h2{margin-top:30px}.roofReportMap{width:100%;max-width:420px;height:auto;border:1px solid #cbd5e1;display:block;margin:10px auto}.roofReportMapBlock{break-inside:avoid;page-break-inside:avoid}@media print{body{margin:14mm}.roofReportMap{width:110mm;max-width:100%;height:auto;margin:8px auto}.roofReportMapBlock h2{margin-top:18px}}</style></head><body>"+report.current.innerHTML+"</body></html>");
     popup.document.close();
     const image=popup.document.querySelector<HTMLImageElement>(".roofReportMap");
     if(!image){popup.close();setPrinting(false);setError("Roof image was missing from the print page. Nothing printed.");return;}
@@ -199,7 +103,6 @@ export default function RoofReport({customer,sections,edges,waste}:{customer?:{n
            <p>Close-up satellite view centered on this property’s traced roof. Colored lines identify the roof facets and edges; corresponding measurements are listed below.</p></>:
          <p>Map image unavailable. Google Maps Static API must be enabled for the same Maps key, and roof outlines or edges must be traced on the satellite map. Measurement totals remain available below.</p>}
       </div>
-      <RoofPerspective sections={sections} edges={edges}/>
       <h2>Roof facets</h2><div className="tableWrap"><table className="table"><thead><tr><th>Facet</th><th>Footprint sq ft</th><th>Pitch</th><th>Surface sq ft</th></tr></thead><tbody>
         {sections.map(section=><tr key={section.id}><td>{section.name}</td><td>{section.footprintSqFt.toFixed(1)}</td><td>{section.pitch}/12</td><td>{surfaceArea(section.footprintSqFt,section.pitch).toFixed(1)}</td></tr>)}
       </tbody></table></div>
