@@ -621,7 +621,7 @@ export default function Home() {
             <div className="tableWrap">
               <table className="table">
                 <thead>
-                  <tr><th>Property</th><th>Name</th><th>Phone</th><th>Email</th><th>Notes</th><th>Actions</th></tr>
+                  <tr><th>Property</th><th>Name</th><th>Phone</th><th>Email</th><th>Lead Created Date</th>{customerListView==="Completed"&&<th>Completed Date</th>}<th>Notes</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):!lead.completed_at)&&[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
@@ -630,6 +630,8 @@ export default function Home() {
                       <td>{lead.name}</td>
                       <td>{lead.phone || "—"}</td>
                       <td>{lead.email || "—"}</td>
+                      <td title={lead.created_at||"Creation date unavailable"}>{lead.created_at?new Date(lead.created_at).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"}</td>
+                      {customerListView==="Completed"&&<td>{lead.completed_at?new Date(lead.completed_at).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"}</td>}
                       <td>{lead.notes || "—"}</td>
                       <td><div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Page</button><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,!Boolean(lead.completed_at))}>{lead.completed_at?"Reopen":"Complete"}</button><button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
                     </tr>
