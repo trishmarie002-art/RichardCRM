@@ -50,46 +50,67 @@ function roofMapImage(sections:Section[],edges:RoofEdge[]){
  paths.forEach(path=>url.searchParams.append("path",path));
  return url.toString().length<8000?url.toString():"";
 }
-// A perspective diagram based on traced plan geometry. Pitch only controls visual
-// separation; this is not a measured roof-height model or an engineering drawing.
+// Perspective illustration from traced roof plan coordinates and entered pitch.
+// Facet peaks approximate visual roof volume, not surveyed elevations or ridge intersections.
 function RoofPerspective({sections,edges}:{sections:Section[];edges:RoofEdge[]}){
  const facets=sections.filter(section=>(section.points||[]).length>=3);
  if(!facets.length)return null;
- const all=facets.flatMap(section=>section.points||[]);
- const lat0=all.reduce((sum,p)=>sum+p.lat,0)/all.length;
- const lng0=all.reduce((sum,p)=>sum+p.lng,0)/all.length;
+ const locations=facets.flatMap(section=>section.points||[]);
+ const lat0=locations.reduce((sum,p)=>sum+p.lat,0)/locations.length;
+ const lng0=locations.reduce((sum,p)=>sum+p.lng,0)/locations.length;
  const cosLat=Math.cos(lat0*Math.PI/180);
- const feet=(p:GeoPoint)=>({x:(p.lng-lng0)*364000*cosLat,y:(lat0-p.lat)*364000});
- const local=all.map(feet);
- const minX=Math.min(...local.map(p=>p.x)),maxX=Math.max(...local.map(p=>p.x));
- const minY=Math.min(...local.map(p=>p.y)),maxY=Math.max(...local.map(p=>p.y));
- const width=Math.max(5,maxX-minX),height=Math.max(5,maxY-minY);
- const scale=Math.min(4.4,420/(width+height));
- const project=(p:GeoPoint)=>{const v=feet(p);return {x:320+((v.x-(minX+maxX)/2)-(v.y-(minY+maxY)/2))*scale*.80,y:180+((v.x-(minX+maxX)/2)+(v.y-(minY+maxY)/2))*scale*.38};};
- const coords=(points:{x:number;y:number}[])=>points.map(p=>p.x.toFixed(1)+","+p.y.toFixed(1)).join(" ");
- const colors=["#e4b347","#e48959","#58aebe","#b68cdb","#67b994","#d994b1"];
- const lines=edges.filter(e=>(e.points||[]).length===2);
- const edgeStroke:{[K in RoofEdge["kind"]]:string}={ridge:"#dc2626",hip:"#c57f0a",valley:"#8b5cf6",eave:"#16a34a",rake:"#0284c7"};
+ const xy=(p:GeoPoint)=>({x:(p.lng-lng0)*364000*cosLat,y:(lat0-p.lat)*364000});
+ const planPoints=locations.map(xy);
+ const xmin=Math.min(...planPoints.map(p=>p.x)),xmax=Math.max(...planPoints.map(p=>p.x));
+ const ymin=Math.min(...planPoints.map(p=>p.y)),ymax=Math.max(...planPoints.map(p=>p.y));
+ const total=Math.max(12,xmax-xmin,ymax-ymin);
+ const scale=Math.min(5.5,360/total);
+ const project=(x:number,y:number,z:number)=>({x:360+(x-y)*.82*scale,y:226+(x+y)*.39*scale-z*.9*scale});
+ const pts=(list:{x:number;y:number}[])=>list.map(p=>p.x.toFixed(1)+","+p.y.toFixed(1)).join(" ");
+ const palette=[["#c0cbd6","#aabaca","#8fa4bb"],["#c9baa9","#b6a18f","#a48d79"],["#b6cbc5","#9cbdb2","#80a69a"],["#cec3d9","#b5a2c7","#9c8ab1"],["#dcc6ad","#c7af95","#af957c"]];
+ const shapes=facets.map((facet,index)=>{
+  const plan=facet.points!.map(xy);
+  const mid={x:plan.reduce((sum,p)=>sum+p.x,0)/plan.length,y:plan.reduce((sum,p)=>sum+p.y,0)/plan.length};
+  const w=Math.max(...plan.map(p=>p.x))-Math.min(...plan.map(p=>p.x));
+  const h=Math.max(...plan.map(p=>p.y))-Math.min(...plan.map(p=>p.y));
+  const rise=Math.min(20,Math.max(0,Math.min(w,h)*Math.min(Math.max(facet.pitch,0),12)/24));
+  const top=plan.map(p=>project(p.x,p.y,0));
+  const walls=plan.map(p=>project(p.x,p.y,-6));
+  const peak=project(mid.x,mid.y,rise);
+  return {facet,index,plan,mid,rise,top,walls,peak,depth:mid.x+mid.y,colors:palette[index%palette.length]};
+ }).sort((a,b)=>a.depth-b.depth);
+ const edgeStroke:Record<RoofEdge["kind"],string>={ridge:"#c63536",hip:"#ce8b24",valley:"#9858b9",eave:"#1f9b6a",rake:"#2c8bb7"};
  return <div className="roof3dBlock">
-  <h2>3D-style roof measurement illustration</h2>
-  <svg className="roof3dPreview" viewBox="0 0 640 380" role="img" aria-label="Perspective illustration of the traced roof sections and edges" xmlns="http://www.w3.org/2000/svg">
-   <rect width="640" height="380" rx="10" fill="#f1f5f9"/>
-   <ellipse cx="320" cy="285" rx="220" ry="48" fill="#64748b" opacity=".13"/>
-   {facets.map((section,index)=>{
-    const projected=section.points!.map(project);
-    const rise=18+Math.min(20,Math.max(0,section.pitch)*1.3);
-    const base=projected.map(p=>({x:p.x,y:p.y+rise}));
-    return <g key={section.id}>
-     <polygon points={coords([...base.slice(1),base[0],projected[0],projected[1]])} fill="#64748b" opacity=".55"/>
-     {projected.map((point,i)=><polygon key={i} points={coords([point,projected[(i+1)%projected.length],base[(i+1)%base.length],base[i]])} fill={colors[index%colors.length]} stroke="#475569" strokeWidth="1" opacity=".67"/>)}
-     <polygon points={coords(projected)} fill={colors[index%colors.length]} fillOpacity=".85" stroke="#334155" strokeWidth="2" strokeLinejoin="round"/>
-     <text x={projected.reduce((n,p)=>n+p.x,0)/projected.length} y={projected.reduce((n,p)=>n+p.y,0)/projected.length} fontSize="13" fontWeight="700" textAnchor="middle" fill="#172334">F{index+1}</text>
+  <h2>3D-style roof illustration</h2>
+  <svg className="roof3dPreview" viewBox="0 0 720 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three-quarter perspective illustration of the measured roof outlines and roof edge lines">
+   <defs>
+    <linearGradient id="roof3d-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#f8fafc"/><stop offset="1" stopColor="#dce8f2"/></linearGradient>
+    <filter id="roof3d-shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
+   </defs>
+   <rect width="720" height="440" rx="12" fill="url(#roof3d-bg)"/>
+   <ellipse cx="360" cy="292" rx="225" ry="66" fill="#52687d" opacity=".17" filter="url(#roof3d-shadow)"/>
+   {shapes.map(shape=>{
+    const n=shape.top.length;
+    const walls=shape.top.map((p,i)=>({key:i,poly:[p,shape.top[(i+1)%n],shape.walls[(i+1)%n],shape.walls[i]],depth:shape.plan[i].x+shape.plan[(i+1)%n].x+shape.plan[i].y+shape.plan[(i+1)%n].y})).sort((a,b)=>a.depth-b.depth);
+    const planes=shape.top.map((p,i)=>({key:i,poly:[p,shape.top[(i+1)%n],shape.peak],shade:shape.colors[i%3],depth:shape.plan[i].x+shape.plan[i].y+shape.plan[(i+1)%n].x+shape.plan[(i+1)%n].y})).sort((a,b)=>a.depth-b.depth);
+    return <g key={shape.facet.id}>
+     {walls.map(wall=><polygon key={"wall"+wall.key} points={pts(wall.poly)} fill={wall.key%2?"#b9c6d2":"#d8e1e9"} stroke="#8293a4" strokeWidth="1.1"/>)}
+     {planes.map(plane=><polygon key={"plane"+plane.key} points={pts(plane.poly)} fill={plane.shade} stroke="#41566a" strokeWidth="1.7" strokeLinejoin="round"/>)}
+     <circle cx={shape.peak.x} cy={shape.peak.y} r="2.5" fill="#334155"/>
+     <text x={shape.peak.x} y={shape.peak.y-9} textAnchor="middle" fontSize="12" fontWeight="700" fill="#20364a" stroke="#f8fafc" strokeWidth="3" paintOrder="stroke">F{shape.index+1} · {shape.facet.pitch}/12</text>
     </g>;
    })}
-   {lines.map(edge=>{const a=project(edge.points![0]),b=project(edge.points![1]);return <line key={edge.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={edgeStroke[edge.kind]} strokeWidth="3.5" strokeLinecap="round"/>;})}
-   <text x="20" y="354" fontSize="12" fill="#475569">Illustrative perspective · not a measured 3D model</text>
+   {edges.filter(edge=>edge.points?.length===2).map(edge=>{
+    const a=xy(edge.points![0]),b=xy(edge.points![1]);
+    // Edge coordinates are traced plan positions. Heights are intentionally not invented.
+    const p=project(a.x,a.y,.7),q=project(b.x,b.y,.7);
+    return <g key={edge.id}><line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke="#fff" strokeWidth="6" strokeLinecap="round"/><line x1={p.x} y1={p.y} x2={q.x} y2={q.y} stroke={edgeStroke[edge.kind]} strokeWidth="3.5" strokeLinecap="round"/></g>;
+   })}
+   <rect x="18" y="18" width="185" height="25" rx="6" fill="#fff" opacity=".93"/>
+   <text x="29" y="35" fontSize="12" fontWeight="700" fill="#334155">ILLUSTRATIVE ROOF VIEW</text>
+   <text x="18" y="415" fontSize="12" fill="#475569">Measured plan footprint · illustrative roof peaks and elevation</text>
   </svg>
-  <p>Perspective based on traced roof outlines and colored edge lines. Heights and slope geometry are illustrative only; verify actual roof elevations, ridges, and pitches on site.</p>
+  <p>Visual roof concept using traced roof boundaries, entered pitch and colored edges. Roof plane heights and ridge intersections are not surveyed; use the satellite map and measurement tables for quantities.</p>
  </div>;
 }
 export default function RoofReport({customer,sections,edges,waste}:{customer?:{name:string;address:string};sections:Section[];edges:RoofEdge[];waste:number}) {
