@@ -107,3 +107,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .customerPhotoFullscreen>.roofToolbar{flex-shrink:0}
 .customerPhotoFullscreen>.small{flex-shrink:0;margin:8px 0}
 @media(max-width:600px){.customerPhotoFullscreen{padding:8px}.customerPhotoFullscreen .customerPhotoNavigatorWrap{right:8px;bottom:8px}}
+
+/* Compact roof report preview in the CRM; the print window defines its own image size. */
+.roofReportMapBlock .roofReportMap{display:block;width:300px;max-width:100%;height:auto;margin:10px auto;border:1px solid #cbd5e1;border-radius:6px}
