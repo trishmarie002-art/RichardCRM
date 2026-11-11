@@ -141,13 +141,13 @@ export default function CustomerWorkspace({customers,userId,initialCustomerId=""
         <div className="formGrid">
           <div className="field"><label htmlFor="activity-kind">Type</label><select id="activity-kind" value={kind} onChange={event=>setKind(event.target.value as Entry["kind"])}><option value="task">Follow-up task</option><option value="appointment">Inspection appointment</option><option value="note">Activity note</option></select></div>
           <div className="field"><label htmlFor="activity-title">Title</label><input id="activity-title" name="title" required maxLength={200} placeholder={kind==="appointment"?"Roof inspection":"Call about estimate"}/></div>
-          {kind!=="note" && <div className="field"><label htmlFor="activity-due">Date & time (your device's time zone)</label><input id="activity-due" name="due" type="datetime-local" required defaultValue={localDateValue(new Date())}/></div>}
+          {kind!=="note" && <div className="field"><label htmlFor="activity-due">Date & time (your device's time zone)</label><input id="activity-due" name="due" type="datetime-local" step={1800} required defaultValue={localDateValue(new Date())}/></div>}
           <div className="field full"><label htmlFor="activity-details">Details</label><textarea id="activity-details" name="details"/></div>
         </div><div className="actions"><button className="btn" disabled={busy || loading}>Save {kind==="task"?"follow-up":kind}</button></div>
       </form>
     </div>
     <div className="card"><div className="sectionTitle"><h3 style={{margin:0}}>{view==="History"?"Customer activity history":"Upcoming & overdue"}</h3><button className="mini" onClick={()=>setView(view==="History"?"Upcoming":"History")}>{view==="History"?"Show upcoming":"Show history"}</button></div>
-      <p className="small muted">Follow-ups appear here when you open the CRM. No automatic emails, texts or push notifications are sent.</p>
+      <p className="small muted">Upcoming and overdue follow-ups are also shown on the Dashboard. Automatic email and push reminders are not enabled.</p>
       {visible.map(entry=><div className="activityItem" key={entry.id}>
         <div><span className="badge">{entry.kind}</span> <strong>{entry.title}</strong>
           <div className="small muted">{entry.due_at?new Date(entry.due_at).toLocaleString():"Added "+new Date(entry.created_at).toLocaleString()}{entry.completed?" · Completed":entry.due_at && new Date(entry.due_at)<new Date()?" · Overdue":""}</div>
