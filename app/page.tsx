@@ -807,6 +807,7 @@ export default function Home() {
             <div className="sectionTitle"><h2>{editingLead ? "Edit Customer" : "Add Roofing Lead"}</h2></div>
             <form action={addLead} key={editingLead?.id || "new"}>
               <div className="formGrid">
+                <div className="field full"><label>Property address</label><input name="address" defaultValue={editingLead?.address ?? ""} /></div>
                 <div className="field"><label>Customer name</label><input name="name" defaultValue={editingLead?.name ?? ""} required /></div>
                 <div className="field"><label>Phone</label><input name="phone" defaultValue={editingLead?.phone ?? ""} /></div>
                 <div className="field"><label>Email</label><input name="email" defaultValue={editingLead?.email ?? ""} type="email" /></div>
@@ -815,7 +816,6 @@ export default function Home() {
                     <option>Facebook</option><option>Google</option><option>Referral</option><option>Door Knock</option><option>Other</option>
                   </select>
                 </div>
-                <div className="field full"><label>Property address</label><input name="address" defaultValue={editingLead?.address ?? ""} /></div>
                 <div className="field"><label htmlFor="potential-job-value">Potential job value (USD)</label><div style={{display:"flex",alignItems:"center",gap:8}}><span aria-hidden="true">$</span><input id="potential-job-value" name="value" type="text" inputMode="decimal" placeholder="10,000.00" defaultValue={editingLead ? editingLead.value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}) : ""} onBlur={event=>{const raw=event.currentTarget.value.trim().replace(/^\$\s*/,"");if(raw&&/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(raw)){const value=Number(raw.replace(/,/g,""));if(Number.isFinite(value)&&value<=9999999999.99)event.currentTarget.value=value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}}} style={{flex:1,minWidth:0}}/></div></div>
                 <div className="field full"><label>Summary notes (dated notes can be added on the Customer Page)</label><textarea name="notes" defaultValue={editingLead?.notes || ""} /></div>
                 <div className="field full"><h3>Additional contacts</h3><p className="muted">Optional spouse, real estate agent, or third-party representative.</p></div>
