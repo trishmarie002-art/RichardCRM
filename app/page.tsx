@@ -49,7 +49,7 @@ type RoofSection = {
   points?: RoofPoint[];
 };
 
-const statuses = ["New Lead", "Inspection", "Estimate Sent", "Won"];
+const statuses = ["New Lead", "Inspection", "Estimate Sent", "Won", "Lost"];
 
 const starterLeads: Lead[] = [
   {
@@ -456,13 +456,12 @@ export default function Home() {
     if (sections.some(section => !Number.isFinite(section.footprintSqFt) || section.footprintSqFt <= 0 || !Number.isFinite(section.pitch) || section.pitch < 0 || section.pitch > 12)) {
       setAuthError("Every roof section needs a positive area and pitch between 0/12 and 12/12."); return;
     }
-    if (edges.some(edge=>!Number.isFinite(edge.horizontalFt) || edge.horizontalFt<=0 || !Number.isFinite(edge.riseFt) || edge.riseFt<0)) {
-      setAuthError("Roof edges need a positive horizontal length and nonnegative height difference."); return;
-    }
+    const completeEdges=edges.filter(edge=>Number.isFinite(edge.horizontalFt)&&edge.horizontalFt>0&&Number.isFinite(edge.riseFt)&&edge.riseFt>=0);
+    const omittedEdges=edges.length-completeEdges.length;
     const record = {
       lead_id: lead.id, property_address: lead.address, waste_percent: waste,
       footprint_sqft: sections.reduce((sum, section) => sum + section.footprintSqFt, 0),
-      roof_surface_sqft: roofTotals.raw, roofing_squares: roofTotals.squares, sections, edges
+      roof_surface_sqft: roofTotals.raw, roofing_squares: roofTotals.squares, sections, edges:completeEdges
     };
     setSyncing(true);
     try {
@@ -486,10 +485,10 @@ export default function Home() {
         localStorage.setItem("richardcrm.measurements.local."+selectedLeadId,JSON.stringify({...record,created_at:createdAt}));
         savedId="local";
       }
-      const current:SavedRoofMeasurement={id:savedId,created_at:createdAt,sections:sections.map(section=>({...section})),edges:edges.map(edge=>({...edge})),waste_percent:waste};
+      const current:SavedRoofMeasurement={id:savedId,created_at:createdAt,sections:sections.map(section=>({...section})),edges:completeEdges.map(edge=>({...edge})),waste_percent:waste};
       setEditingMeasurementId(savedId);
       setSavedMeasurements(old=>[current,...old.filter(item=>item.id!==savedId)].sort((a,b)=>b.created_at.localeCompare(a.created_at)));
-      setMeasurementMessage(editingMeasurementId?"Saved changes to the existing roof measurement.":"New roof measurement saved.");
+      setMeasurementMessage((editingMeasurementId?"Saved changes to the existing roof measurement.":"New roof measurement saved.")+(omittedEdges?` ${omittedEdges} incomplete edge(s) without measured lengths were not included. Complete them and save again if needed.`:""));
     } catch (error) { setAuthError(error instanceof Error ? error.message : "Unable to save measurement."); }
     finally { setSyncing(false); }
   }
