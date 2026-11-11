@@ -643,7 +643,7 @@ export default function Home() {
         )}
 
         {["Inspections","Profit Calculator","Estimate Options","Warranties"].includes(tab) && <BusinessTools key={tab} mode={tab} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} onOpen={(target,id,option)=>{if(id)setCustomerContext(id);setEstimateOption(option||null);setTab(target);}}/>}
-        {tab === "Customer Map" && <CustomerMap customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);if(target==="Customer Page")setCustomerHubId(id);setTab(target);}}/>}}
+        {tab === "Customer Map" && <CustomerMap customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);if(target==="Customer Page")setCustomerHubId(id);setTab(target);}}/>}
         {tab === "Follow-ups" && <FollowUps customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);setTab(target);}}/>}
         {tab === "Message Templates" && <MessageTemplates customers={leads} userId={userId} initialCustomerId={customerContext}/>}
         {tab === "Lead Files" && <LeadFiles leads={leads} userId={userId} initialLeadId={customerContext} onSelect={setCustomerContext}/>}
