@@ -10,7 +10,7 @@ declare global { interface Window { google?: any; gm_authFailure?: () => void; }
 
 const edgeColors:Record<RoofEdge["kind"],string>={ridge:"#ef4444",hip:"#f59e0b",valley:"#a855f7",eave:"#22c55e",rake:"#38bdf8"};
 const facetColors=["#ffdb58","#ff7b54","#76e4f7","#de83fc","#66e4a3","#ff9cdb"];
-export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdgeUpdate, facets, edges }: { address: string; onFacet: (facet: TracedFacet) => void; onEdge: (edge: RoofEdge) => void; onFacetUpdate:(id:number,points:RoofPoint[],area:number)=>void; onEdgeUpdate:(id:string,points:RoofPoint[],distance:number)=>void; facets: {id:number;name:string;footprintSqFt:number;points?: RoofPoint[] }[]; edges: RoofEdge[] }) {
+export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdgeUpdate, facets, edges, onDeleteMeasurement, canDeleteMeasurement, deletingMeasurement }: { address: string; onFacet: (facet: TracedFacet) => void; onEdge: (edge: RoofEdge) => void; onFacetUpdate:(id:number,points:RoofPoint[],area:number)=>void; onEdgeUpdate:(id:string,points:RoofPoint[],distance:number)=>void; facets: {id:number;name:string;footprintSqFt:number;points?: RoofPoint[] }[]; edges: RoofEdge[]; onDeleteMeasurement:()=>void;canDeleteMeasurement:boolean;deletingMeasurement:boolean }) {
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
@@ -218,6 +218,7 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       <button className="mini" disabled={!mapReady||authFailed||searching} onClick={() => setDrawing(!drawing)}>{drawing ? "Pause tracing" : "Start tracing"}</button>
       <button className="mini" disabled={!points.length} onClick={() => setPoints(current => current.slice(0,-1))}>Undo corner</button>
       <button className="mini" onClick={() => { setPoints([]);unfinishedByTool.current[tool]=[]; }}>Clear current trace</button>
+       <button type="button" className="mini" disabled={!canDeleteMeasurement||deletingMeasurement} onClick={onDeleteMeasurement} style={{color:"#b42318",borderColor:"#b42318"}} title="Permanently delete the selected saved measurement after confirmation">{deletingMeasurement?"Deleting…":"Delete Entire Measurement"}</button>
       <div className="field"><label htmlFor="facet-pitch">Facet pitch</label><select id="facet-pitch" value={pitch??""} onChange={event => setPitch(event.target.value===""?null:Number(event.target.value))}><option value="">Choose inspected pitch</option>{Array.from({length:13},(_,i)=><option key={i} value={i}>{i}/12</option>)}</select></div>
       <button className="btn" disabled={!mapReady||authFailed||searching||(tool==="facet"?(points.length<3||pitch===null):points.length!==2)} onClick={finish}>Add {tool} ({points.length} corners)</button>
     </div>
