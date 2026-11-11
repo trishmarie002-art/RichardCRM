@@ -121,6 +121,7 @@ export default function Home() {
   const [customerListView,setCustomerListView]=useState<"Active"|"Completed">("Active");
   const [localReady, setLocalReady] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [newLeadAddress,setNewLeadAddress]=useState("");
   const [sections, setSections] = useState<RoofSection[]>([
     { id: 1, name: "Main Roof", footprintSqFt: 1800, pitch: 6 }
   ]);
@@ -345,7 +346,7 @@ export default function Home() {
         const saved: Lead = {...draft,id:editingLead?.id || crypto.randomUUID(),value:draft.potential_value};
         setLeads(current=>editingLead?current.map(item=>item.id===saved.id?saved:item):[saved,...current]);
       }
-      setShowForm(false); setEditingLead(null); setAuthError("");
+      setShowForm(false); setEditingLead(null); setNewLeadAddress(""); setAuthError("");
     } catch (error) { setAuthError(error instanceof Error?error.message:"Could not save lead."); }
     finally { setSyncing(false); }
   }
@@ -561,7 +562,7 @@ export default function Home() {
             <h1>{tab}</h1>
             <div className="muted">Manage roofing leads, customers, estimates and roof measurements.</div>
           </div>
-          <button className="btn" onClick={() => { setEditingLead(null); setShowForm(true); }}>+ New Lead</button>
+          <button className="btn" onClick={() => { setEditingLead(null); setNewLeadAddress(""); setShowForm(true); }}>+ New Lead</button>
         </div>
 
         {authError && <div className="notice" style={{ marginBottom: 16 }}>{authError}</div>}
@@ -677,7 +678,7 @@ export default function Home() {
         )}
 
         {["Inspections","Profit Calculator","Estimate Options","Warranties"].includes(tab) && <BusinessTools key={tab} mode={tab} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} onOpen={(target,id,option)=>{if(id)setCustomerContext(id);setEstimateOption(option||null);setTab(target);}}/>}
-        {tab === "Customer Map" && <CustomerMap customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);if(target==="Customer Page")setCustomerHubId(id);setTab(target);}}/>}
+        {tab === "Customer Map" && <CustomerMap customers={leads} userId={userId} onAddLead={(address)=>{setEditingLead(null);setNewLeadAddress(address);setShowForm(true);}} onOpen={(target,id)=>{setCustomerContext(id);if(target==="Customer Page")setCustomerHubId(id);setTab(target);}}/>}
         {tab === "Follow-ups" && <FollowUps customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);setTab(target);}}/>}
         {tab === "Message Templates" && <MessageTemplates customers={leads} userId={userId} initialCustomerId={customerContext}/>}
         {tab === "Lead Files" && <LeadFiles leads={leads} userId={userId} initialLeadId={customerContext} onSelect={setCustomerContext}/>}
@@ -807,9 +808,9 @@ export default function Home() {
         <div className="modalBack" onClick={() => setShowForm(false)}>
           <div className="card modal" onClick={(e) => e.stopPropagation()}>
             <div className="sectionTitle"><h2>{editingLead ? "Edit Customer" : "Add Roofing Lead"}</h2></div>
-            <form action={addLead} key={editingLead?.id || "new"}>
+            <form action={addLead} key={editingLead?.id || newLeadAddress || "new"}>
               <div className="formGrid">
-                <div className="field full"><label>Property address</label><input name="address" defaultValue={editingLead?.address ?? ""} /></div>
+                <div className="field full"><label>Property address</label><input name="address" defaultValue={editingLead?.address ?? newLeadAddress} /></div>
                 <div className="field"><label>Customer name</label><input name="name" defaultValue={editingLead?.name ?? ""} required /></div>
                 <div className="field"><label>Phone</label><input name="phone" defaultValue={editingLead?.phone ?? ""} /></div>
                 <div className="field"><label>Email</label><input name="email" defaultValue={editingLead?.email ?? ""} type="email" /></div>
