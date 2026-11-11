@@ -50,6 +50,48 @@ function roofMapImage(sections:Section[],edges:RoofEdge[]){
  paths.forEach(path=>url.searchParams.append("path",path));
  return url.toString().length<8000?url.toString():"";
 }
+// A perspective diagram based on traced plan geometry. Pitch only controls visual
+// separation; this is not a measured roof-height model or an engineering drawing.
+function RoofPerspective({sections,edges}:{sections:Section[];edges:RoofEdge[]}){
+ const facets=sections.filter(section=>(section.points||[]).length>=3);
+ if(!facets.length)return null;
+ const all=facets.flatMap(section=>section.points||[]);
+ const lat0=all.reduce((sum,p)=>sum+p.lat,0)/all.length;
+ const lng0=all.reduce((sum,p)=>sum+p.lng,0)/all.length;
+ const cosLat=Math.cos(lat0*Math.PI/180);
+ const feet=(p:GeoPoint)=>({x:(p.lng-lng0)*364000*cosLat,y:(lat0-p.lat)*364000});
+ const local=all.map(feet);
+ const minX=Math.min(...local.map(p=>p.x)),maxX=Math.max(...local.map(p=>p.x));
+ const minY=Math.min(...local.map(p=>p.y)),maxY=Math.max(...local.map(p=>p.y));
+ const width=Math.max(5,maxX-minX),height=Math.max(5,maxY-minY);
+ const scale=Math.min(4.4,420/(width+height));
+ const project=(p:GeoPoint)=>{const v=feet(p);return {x:320+((v.x-(minX+maxX)/2)-(v.y-(minY+maxY)/2))*scale*.80,y:180+((v.x-(minX+maxX)/2)+(v.y-(minY+maxY)/2))*scale*.38};};
+ const coords=(points:{x:number;y:number}[])=>points.map(p=>p.x.toFixed(1)+","+p.y.toFixed(1)).join(" ");
+ const colors=["#e4b347","#e48959","#58aebe","#b68cdb","#67b994","#d994b1"];
+ const lines=edges.filter(e=>(e.points||[]).length===2);
+ const edgeStroke:{[K in RoofEdge["kind"]]:string}={ridge:"#dc2626",hip:"#c57f0a",valley:"#8b5cf6",eave:"#16a34a",rake:"#0284c7"};
+ return <div className="roof3dBlock">
+  <h2>3D-style roof measurement illustration</h2>
+  <svg className="roof3dPreview" viewBox="0 0 640 380" role="img" aria-label="Perspective illustration of the traced roof sections and edges" xmlns="http://www.w3.org/2000/svg">
+   <rect width="640" height="380" rx="10" fill="#f1f5f9"/>
+   <ellipse cx="320" cy="285" rx="220" ry="48" fill="#64748b" opacity=".13"/>
+   {facets.map((section,index)=>{
+    const projected=section.points!.map(project);
+    const rise=18+Math.min(20,Math.max(0,section.pitch)*1.3);
+    const base=projected.map(p=>({x:p.x,y:p.y+rise}));
+    return <g key={section.id}>
+     <polygon points={coords([...base.slice(1),base[0],projected[0],projected[1]])} fill="#64748b" opacity=".55"/>
+     {projected.map((point,i)=><polygon key={i} points={coords([point,projected[(i+1)%projected.length],base[(i+1)%base.length],base[i]])} fill={colors[index%colors.length]} stroke="#475569" strokeWidth="1" opacity=".67"/>)}
+     <polygon points={coords(projected)} fill={colors[index%colors.length]} fillOpacity=".85" stroke="#334155" strokeWidth="2" strokeLinejoin="round"/>
+     <text x={projected.reduce((n,p)=>n+p.x,0)/projected.length} y={projected.reduce((n,p)=>n+p.y,0)/projected.length} fontSize="13" fontWeight="700" textAnchor="middle" fill="#172334">F{index+1}</text>
+    </g>;
+   })}
+   {lines.map(edge=>{const a=project(edge.points![0]),b=project(edge.points![1]);return <line key={edge.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={edgeStroke[edge.kind]} strokeWidth="3.5" strokeLinecap="round"/>;})}
+   <text x="20" y="354" fontSize="12" fill="#475569">Illustrative perspective · not a measured 3D model</text>
+  </svg>
+  <p>Perspective based on traced roof outlines and colored edge lines. Heights and slope geometry are illustrative only; verify actual roof elevations, ridges, and pitches on site.</p>
+ </div>;
+}
 export default function RoofReport({customer,sections,edges,waste}:{customer?:{name:string;address:string};sections:Section[];edges:RoofEdge[];waste:number}) {
   const report=useRef<HTMLDivElement>(null);
   const [error,setError]=useState("");
@@ -75,7 +117,7 @@ export default function RoofReport({customer,sections,edges,waste}:{customer?:{n
     if(!popup){setError("Allow popups to print the roof report.");return;}
     popup.opener=null;
     setPrinting(true);
-    popup.document.write("<!doctype html><html><head><title>Roof measurement report</title><style>body{font:15px system-ui;color:#162333;margin:30px}h1{border-bottom:3px solid #df971e;padding-bottom:15px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{text-align:left;border-bottom:1px solid #ccc;padding:9px}p{line-height:1.5}h2{margin-top:30px}.roofReportMap{width:100%;max-width:420px;height:auto;border:1px solid #cbd5e1;display:block;margin:10px auto}.roofReportMapBlock{break-inside:avoid;page-break-inside:avoid}@media print{body{margin:14mm}.roofReportMap{width:110mm;max-width:100%;height:auto;margin:8px auto}.roofReportMapBlock h2{margin-top:18px}}</style></head><body>"+report.current.innerHTML+"</body></html>");
+    popup.document.write("<!doctype html><html><head><title>Roof measurement report</title><style>body{font:15px system-ui;color:#162333;margin:30px}h1{border-bottom:3px solid #df971e;padding-bottom:15px}table{width:100%;border-collapse:collapse;margin:20px 0}th,td{text-align:left;border-bottom:1px solid #ccc;padding:9px}p{line-height:1.5}h2{margin-top:30px}.roofReportMap{width:100%;max-width:420px;height:auto;border:1px solid #cbd5e1;display:block;margin:10px auto}.roofReportMapBlock{break-inside:avoid;page-break-inside:avoid}@media print{body{margin:14mm}.roofReportMap{width:110mm;max-width:100%;height:auto;margin:8px auto}.roofReportMapBlock h2{margin-top:18px}.roof3dPreview{display:block;width:110mm;max-width:100%;height:auto;margin:8px auto}.roof3dBlock{break-inside:avoid;page-break-inside:avoid}.roof3dBlock h2{margin-top:18px}}</style></head><body>"+report.current.innerHTML+"</body></html>");
     popup.document.close();
     const image=popup.document.querySelector<HTMLImageElement>(".roofReportMap");
     if(!image){popup.close();setPrinting(false);setError("Roof image was missing from the print page. Nothing printed.");return;}
@@ -103,6 +145,7 @@ export default function RoofReport({customer,sections,edges,waste}:{customer?:{n
            <p>Close-up satellite view centered on this property’s traced roof. Colored lines identify the roof facets and edges; corresponding measurements are listed below.</p></>:
          <p>Map image unavailable. Google Maps Static API must be enabled for the same Maps key, and roof outlines or edges must be traced on the satellite map. Measurement totals remain available below.</p>}
       </div>
+      <RoofPerspective sections={sections} edges={edges}/>
       <h2>Roof facets</h2><div className="tableWrap"><table className="table"><thead><tr><th>Facet</th><th>Footprint sq ft</th><th>Pitch</th><th>Surface sq ft</th></tr></thead><tbody>
         {sections.map(section=><tr key={section.id}><td>{section.name}</td><td>{section.footprintSqFt.toFixed(1)}</td><td>{section.pitch}/12</td><td>{surfaceArea(section.footprintSqFt,section.pitch).toFixed(1)}</td></tr>)}
       </tbody></table></div>
