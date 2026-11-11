@@ -62,3 +62,21 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .roof-length-label{background:rgba(10,23,37,.92);color:#fff!important;padding:4px 7px;border:1px solid rgba(255,255,255,.65);border-radius:5px;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.45);pointer-events:none}
 
 .sidebarBrand{display:flex;align-items:center;flex-direction:column;gap:4px}.sidebarBrand img{display:block;width:206px;max-width:100%;height:auto}.sidebarCrmLabel{color:#ff9f1c;font-size:12px;letter-spacing:3px;font-weight:900}
+
+/* Compact customer page header: keep work sections near the top. */
+.customerHubSummary{margin-bottom:12px;padding:14px 18px}
+.customerHubActions{margin:0 0 10px;gap:8px}
+.customerHubHeading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.customerHubName{font-size:27px;line-height:1.2;margin:0 0 3px;font-weight:850;color:var(--text)}
+.customerHubAddress{font-size:13px;line-height:1.45;color:var(--muted);margin:0}
+.customerHubStatus{white-space:nowrap}
+.customerHubQuickDetails{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+.customerHubQuickDetails>div{min-width:0;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;background:#f5f8fb}
+.customerHubQuickDetails span{color:var(--muted);font-size:11px;font-weight:600}
+.customerHubQuickDetails strong{font-size:12px;overflow-wrap:anywhere;line-height:1.4}
+.customerHubBottomActions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
+.customerHubBottomActions .roofToolbar{margin:0;gap:7px}
+.customerHubBottomActions .btn{font-size:12px;padding:7px 12px;text-decoration:none}
+.customerHubExpanded{border-top:1px solid var(--line);margin-top:12px;padding-top:2px}
+@media(max-width:1000px){.customerHubQuickDetails{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:530px){.customerHubName{font-size:23px}.customerHubHeading{flex-wrap:wrap}.customerHubQuickDetails{gap:7px}.customerHubQuickDetails>div{padding:7px}}
