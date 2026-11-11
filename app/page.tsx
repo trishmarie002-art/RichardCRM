@@ -38,6 +38,8 @@ type Lead = {
   created_at?: string;
 };
 
+type SavedRoofMeasurement = {id:string;created_at:string;sections:RoofSection[];edges:RoofEdge[];waste_percent:number};
+
 type RoofSection = {
   id: number;
   name: string;
@@ -134,6 +136,19 @@ export default function Home() {
     setEdges(current=>current.map(edge=>edge.id===id?{...edge,points,horizontalFt}:edge));
   },[]);
   const [measurementReady, setMeasurementReady] = useState(false);
+  const [savedMeasurements,setSavedMeasurements]=useState<SavedRoofMeasurement[]>([]);
+  const [editingMeasurementId,setEditingMeasurementId]=useState("");
+  const [measurementRevision,setMeasurementRevision]=useState(0);
+  const [measurementMessage,setMeasurementMessage]=useState("");
+  function loadMeasurementIntoEditor(record:SavedRoofMeasurement){
+    setSections(record.sections||[]);
+    setEdges(record.edges||[]);
+    setWaste(Number(record.waste_percent??10));
+    setEditingMeasurementId(record.id);
+    setMeasurementRevision(n=>n+1);
+    setMeasurementMessage("Loaded saved measurement from "+new Date(record.created_at).toLocaleString()+". Edit it and save changes.");
+  }
+
   const [waste, setWaste] = useState(10);
   const [userId, setUserId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(!cloudMode);
@@ -199,26 +214,40 @@ export default function Home() {
   }, [cloudMode, supabase, userId]);
 
   useEffect(() => {
-    let active = true;
-    setMeasurementReady(false); setSections([]); setEdges([]); setWaste(10);
-    const load = async () => {
-      try {
-        if (cloudMode && supabase && userId && selectedLeadId) {
-          const {data, error} = await supabase.from("roof_measurements").select("sections,waste_percent,edges").eq("lead_id",selectedLeadId).order("created_at",{ascending:false}).limit(1).maybeSingle();
-          if (!active) return;
-          if (error) throw error;
-          if (data) { setSections(data.sections); setEdges(data.edges || []); setWaste(Number(data.waste_percent)); }
-        } else if (!cloudMode && selectedLeadId) {
-          const saved = localStorage.getItem("richardcrm.measurements.local." + selectedLeadId);
-          if (saved) { const record=JSON.parse(saved); setSections(record.sections || []); setEdges(record.edges || []); setWaste(record.waste_percent ?? 10); }
+    let active=true;
+    setMeasurementReady(false);setSections([]);setEdges([]);setWaste(10);
+    setSavedMeasurements([]);setEditingMeasurementId("");setMeasurementMessage("");
+    async function load(){
+      try{
+        if(!selectedLeadId)return;
+        if(cloudMode){
+          if(!supabase||!userId)throw new Error("Sign in to view saved measurements.");
+          const {data,error}=await supabase.from("roof_measurements")
+            .select("id,created_at,sections,edges,waste_percent")
+            .eq("lead_id",selectedLeadId).order("created_at",{ascending:false}).limit(100);
+          if(error)throw error;
+          if(!active)return;
+          const records=(data||[]) as SavedRoofMeasurement[];
+          setSavedMeasurements(records);
+          if(records.length){
+            const first=records[0];
+            setSections(first.sections||[]);setEdges(first.edges||[]);setWaste(Number(first.waste_percent??10));
+            setEditingMeasurementId(first.id);
+          }
+        }else{
+          const saved=localStorage.getItem("richardcrm.measurements.local."+selectedLeadId);
+          if(saved){
+            const record=JSON.parse(saved);
+            const item:SavedRoofMeasurement={id:"local",created_at:record.created_at||new Date().toISOString(),sections:record.sections||[],edges:record.edges||[],waste_percent:record.waste_percent??10};
+            if(active){setSavedMeasurements([item]);setEditingMeasurementId("local");setSections(item.sections);setEdges(item.edges);setWaste(Number(item.waste_percent));}
+          }
         }
-      } catch (error) { if (active) setAuthError(error instanceof Error ? error.message : "Could not load saved measurement."); }
-      finally { if (active) setMeasurementReady(true); }
-    };
+      }catch(error){if(active)setMeasurementMessage(error instanceof Error?error.message:"Could not load saved measurement.");}
+      finally{if(active)setMeasurementReady(true);}
+    }
     void load();
-    return () => { active = false; };
-  }, [selectedLeadId, userId, cloudMode, supabase]);
-
+    return()=>{active=false;};
+  },[selectedLeadId,userId,cloudMode,supabase]);
   const openPipeline = leads.filter((l) => l.status !== "Won" && l.status !== "Lost").reduce((sum, l) => sum + l.value, 0);
   const wonRevenue = leads.filter((l) => l.status === "Won").reduce((sum, l) => sum + l.value, 0);
   const inspectionCount = leads.filter((l) => l.status === "Inspection").length;
@@ -404,12 +433,30 @@ export default function Home() {
     };
     setSyncing(true);
     try {
-      if (cloudMode && supabase && userId) {
-        const { error } = await supabase.from("roof_measurements").insert({ ...record, user_id: userId });
-        if (error) throw error;
+      let savedId=editingMeasurementId;
+      let createdAt=new Date().toISOString();
+      if(cloudMode){
+        if(!supabase||!userId)throw new Error("Sign in to save roof measurements.");
+        if(editingMeasurementId){
+          const {data,error}=await supabase.from("roof_measurements").update(record)
+            .eq("id",editingMeasurementId).eq("lead_id",selectedLeadId)
+            .select("id,created_at").single();
+          if(error)throw error;
+          savedId=data.id;createdAt=data.created_at;
+        }else{
+          const {data,error}=await supabase.from("roof_measurements").insert({...record,user_id:userId})
+            .select("id,created_at").single();
+          if(error)throw error;
+          savedId=data.id;createdAt=data.created_at;
+        }
+      }else{
+        localStorage.setItem("richardcrm.measurements.local."+selectedLeadId,JSON.stringify({...record,created_at:createdAt}));
+        savedId="local";
       }
-      if (!cloudMode) localStorage.setItem("richardcrm.measurements.local." + selectedLeadId, JSON.stringify(record));
-      setAuthError(cloudMode ? "Measurement saved to this customer in cloud storage." : "Measurement saved to this customer in this browser.");
+      const current:SavedRoofMeasurement={id:savedId,created_at:createdAt,sections:sections.map(section=>({...section})),edges:edges.map(edge=>({...edge})),waste_percent:waste};
+      setEditingMeasurementId(savedId);
+      setSavedMeasurements(old=>[current,...old.filter(item=>item.id!==savedId)].sort((a,b)=>b.created_at.localeCompare(a.created_at)));
+      setMeasurementMessage(editingMeasurementId?"Saved changes to the existing roof measurement.":"New roof measurement saved.");
     } catch (error) { setAuthError(error instanceof Error ? error.message : "Unable to save measurement."); }
     finally { setSyncing(false); }
   }
@@ -616,7 +663,19 @@ export default function Home() {
               </select>
             </div>
           </div>
-          {selectedLeadId && measurementReady ? <RoofMap facets={sections} edges={edges} onFacetUpdate={updateFacetGeometry} onEdgeUpdate={updateEdgeGeometry} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
+          {selectedLeadId&&measurementReady&&<div className="card" style={{marginBottom:16}}>
+            <h2>Saved roof measurements</h2>
+            {savedMeasurements.length>0?<><div className="field"><label htmlFor="saved-roof-record">Choose a saved measurement to edit</label>
+            <select id="saved-roof-record" value={editingMeasurementId} onChange={event=>{
+              if(event.target.value===""){setEditingMeasurementId("");setSections([]);setEdges([]);setWaste(10);setMeasurementRevision(n=>n+1);setMeasurementMessage("New measurement started.");return;}
+              const record=savedMeasurements.find(row=>row.id===event.target.value);if(record)loadMeasurementIntoEditor(record);
+            }}>
+              <option value="">+ Start a new measurement</option>
+              {savedMeasurements.map((record,index)=><option key={record.id} value={record.id}>{new Date(record.created_at).toLocaleString()}{index===0?" (latest)":""}</option>)}
+            </select></div><p className="small muted">Selecting an existing measurement loads its roof sections, mapped outlines, edge lengths, and waste factor. Saving updates that record, rather than creating a duplicate.</p></>:<p className="muted">No saved measurement yet. Trace the roof or add measurements manually, then save.</p>}
+            {measurementMessage&&<p className="notice" role="status">{measurementMessage}</p>}
+          </div>}
+          {selectedLeadId && measurementReady ? <RoofMap facets={sections} edges={edges} onFacetUpdate={updateFacetGeometry} onEdgeUpdate={updateEdgeGeometry} onEdge={edge=>setEdges(current=>[...current,edge])} key={selectedLeadId+"-"+measurementRevision} address={leads.find(lead => lead.id === selectedLeadId)?.address || ""} onFacet={facet => setSections(current => [...current, {...facet, name: "Facet " + (current.length+1)}])} /> : <p className="notice">{selectedLeadId?"Loading saved roof measurement…":"Choose a customer to open the satellite measurement workspace."}</p>}
           <div className="measureLayout">
             <div className="card">
               <div className="sectionTitle">
@@ -681,7 +740,7 @@ export default function Home() {
               <div className="kpi"><span>Bundles @ 3/square</span><strong>{Math.ceil(roofTotals.squares * 3)}</strong></div>
 
               <button className="btn" style={{ width: "100%", marginTop: 14 }} onClick={saveMeasurement} disabled={syncing || !measurementReady || !selectedLeadId || sections.length === 0}>
-                {syncing ? "Saving…" : "Save Measurement"}
+                {syncing ? "Saving…" : editingMeasurementId ? "Save Changes to Measurement" : "Save New Measurement"}
               </button>
             </div>
           </div>
