@@ -7,6 +7,7 @@ import MessageTemplates from "@/components/MessageTemplates";
 import LeadFiles from "@/components/LeadFiles";
 import DashboardOverview from "@/components/DashboardOverview";
 import Calendar from "@/components/Calendar";
+import WeatherForecast from "@/components/WeatherForecast";
 import Invoices from "@/components/Invoices";
 import Jobs from "@/components/Jobs";
 import DailySchedule from "@/components/DailySchedule";
@@ -542,7 +543,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Message Templates"].map((item) => (
+          {["Dashboard", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Weather", "Message Templates"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);if(item==="Customer Page"){setCustomerHubId("");setSearch("");}setTab(item);}}>
               {item}
             </button>
@@ -565,6 +566,8 @@ export default function Home() {
         </div>
 
         {authError && <div className="notice" style={{ marginBottom: 16 }}>{authError}</div>}
+
+        {tab === "Weather" && <WeatherForecast/>}
 
         {tab === "Dashboard" && (
           <>
