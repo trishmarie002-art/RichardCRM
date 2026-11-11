@@ -31,6 +31,11 @@ type Lead = {
   source: string;
   value: number;
   notes: string;
+  job_type?: string;
+  salesperson?: string;
+  additional_contacts?: {name:string;role:string;phone:string;email:string}[];
+  completed_at?: string|null;
+  created_at?: string;
 };
 
 type RoofSection = {
@@ -93,7 +98,12 @@ function mapDbLead(row: any): Lead {
     status: row.status ?? "New Lead",
     source: row.source ?? "Other",
     value: Number(row.potential_value ?? 0),
-    notes: row.notes ?? ""
+    notes: row.notes ?? "",
+    job_type: row.job_type ?? "Roof Replacement - Residential",
+    salesperson: row.salesperson ?? "",
+    additional_contacts: Array.isArray(row.additional_contacts)?row.additional_contacts:[],
+    completed_at: row.completed_at ?? null,
+    created_at: row.created_at ?? ""
   };
 }
 
@@ -105,6 +115,7 @@ export default function Home() {
   const [leads, setLeads] = useState<Lead[]>(cloudMode ? [] : starterLeads);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [search, setSearch] = useState("");
+  const [customerListView,setCustomerListView]=useState<"Active"|"Completed">("Active");
   const [localReady, setLocalReady] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [sections, setSections] = useState<RoofSection[]>([
@@ -277,7 +288,10 @@ export default function Home() {
       status: editingLead?.status || "New Lead",
       source: String(formData.get("source") || "Other"),
       potential_value: jobValue,
-      notes: String(formData.get("notes") || "")
+      notes: String(formData.get("notes") || ""),
+      job_type: String(formData.get("job_type") || "Roof Replacement - Residential"),
+      salesperson: String(formData.get("salesperson") || "").trim(),
+      additional_contacts: [0,1,2].map(i=>({name:String(formData.get("contact_name_"+i)||"").trim(),role:String(formData.get("contact_role_"+i)||"").trim(),phone:String(formData.get("contact_phone_"+i)||"").trim(),email:String(formData.get("contact_email_"+i)||"").trim()})).filter(c=>c.name||c.phone||c.email)
     };
 
     setSyncing(true);
@@ -298,6 +312,21 @@ export default function Home() {
       setShowForm(false); setEditingLead(null); setAuthError("");
     } catch (error) { setAuthError(error instanceof Error?error.message:"Could not save lead."); }
     finally { setSyncing(false); }
+  }
+
+  async function toggleCompleted(id:string,completed:boolean){
+    if(syncing)return;
+    setSyncing(true);
+    const date=completed?new Date().toISOString():null;
+    try{
+      if(cloudMode){
+        if(!supabase||!userId)throw new Error("Sign in first.");
+        const {error}=await supabase.from("leads").update({completed_at:date}).eq("id",id).select("id").single();
+        if(error)throw error;
+      }
+      setLeads(current=>current.map(lead=>lead.id===id?{...lead,completed_at:date}:lead));
+    }catch(error){setAuthError(error instanceof Error?error.message:"Could not change completion status.");}
+    finally{setSyncing(false);}
   }
 
   async function moveLead(id: string, direction: number) {
@@ -428,7 +457,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Customer Page", "Roof Measure", "Estimates", "Sent Estimates", "Customer Workspace", "Daily Schedule", "Invoices", "Calendar", "Lead Files", "Inspections", "Profit Calculator", "Follow-ups", "Estimate Options", "Warranties", "Message Templates", "Customer Map", "Jobs"].map((item) => (
+          {["Dashboard", "Customers", "Customer Page", "Follow-ups", "Calendar"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);setTab(item);}}>
               {item}
             </button>
@@ -534,22 +563,22 @@ export default function Home() {
 
         {tab === "Customers" && (
           <div className="card">
-            <div className="sectionTitle"><h2>Customer & Property Records</h2></div>
+            <div className="sectionTitle"><h2>Customer & Property Records</h2></div><div className="roofToolbar"><button className={customerListView==="Active"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Active")}>Active customers</button><button className={customerListView==="Completed"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Completed")}>Completed customers</button></div>
             <div className="field"><label htmlFor="customer-search">Search customers</label><input id="customer-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Name, address, phone or email" /></div>
             <div className="tableWrap">
               <table className="table">
                 <thead>
-                  <tr><th>Name</th><th>Phone</th><th>Email</th><th>Property</th><th>Notes</th><th>Actions</th></tr>
+                  <tr><th>Property</th><th>Name</th><th>Phone</th><th>Email</th><th>Notes</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                  {leads.filter(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
+                  {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):!lead.completed_at)&&[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
                     <tr key={lead.id}>
-                      <td><button type="button" className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}} style={{fontWeight:700,textAlign:"left"}}>{lead.name}</button></td>
+                      <td><button type="button" className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}} style={{fontWeight:700,textAlign:"left"}}>{lead.address||"Address missing"}</button></td>
+                      <td>{lead.name}</td>
                       <td>{lead.phone || "—"}</td>
                       <td>{lead.email || "—"}</td>
-                      <td>{lead.address || "—"}</td>
                       <td>{lead.notes || "—"}</td>
-                      <td><div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Page</button><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
+                      <td><div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Page</button><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,!Boolean(lead.completed_at))}>{lead.completed_at?"Reopen":"Complete"}</button><button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -675,14 +704,16 @@ export default function Home() {
                 <div className="field"><label>Customer name</label><input name="name" defaultValue={editingLead?.name ?? ""} required /></div>
                 <div className="field"><label>Phone</label><input name="phone" defaultValue={editingLead?.phone ?? ""} /></div>
                 <div className="field"><label>Email</label><input name="email" defaultValue={editingLead?.email ?? ""} type="email" /></div>
-                <div className="field"><label>Lead source</label>
+                <div className="field"><label>Salesperson / lead owner</label><input name="salesperson" maxLength={200} defaultValue={editingLead?.salesperson||""}/></div><div className="field"><label>Job type</label><select name="job_type" defaultValue={editingLead?.job_type||"Roof Replacement - Residential"}>{["Repair","Roof Replacement - Residential","Roof Replacement - Commercial"].map(value=><option key={value}>{value}</option>)}</select></div><div className="field"><label>Lead source</label>
                   <select name="source" defaultValue={editingLead?.source || "Facebook"}>
                     <option>Facebook</option><option>Google</option><option>Referral</option><option>Door Knock</option><option>Other</option>
                   </select>
                 </div>
                 <div className="field full"><label>Property address</label><input name="address" defaultValue={editingLead?.address ?? ""} /></div>
                 <div className="field"><label htmlFor="potential-job-value">Potential job value (USD)</label><div style={{display:"flex",alignItems:"center",gap:8}}><span aria-hidden="true">$</span><input id="potential-job-value" name="value" type="text" inputMode="decimal" placeholder="10,000.00" defaultValue={editingLead ? editingLead.value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}) : ""} onBlur={event=>{const raw=event.currentTarget.value.trim().replace(/^\$\s*/,"");if(raw&&/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(raw)){const value=Number(raw.replace(/,/g,""));if(Number.isFinite(value)&&value<=9999999999.99)event.currentTarget.value=value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}}} style={{flex:1,minWidth:0}}/></div></div>
-                <div className="field full"><label>Notes</label><textarea name="notes" defaultValue={editingLead?.notes || ""} /></div>
+                <div className="field full"><label>Summary notes (dated notes can be added on the Customer Page)</label><textarea name="notes" defaultValue={editingLead?.notes || ""} /></div>
+                <div className="field full"><h3>Additional contacts</h3><p className="muted">Optional spouse, real estate agent, or third-party representative.</p></div>
+                {[0,1,2].map(i=><div className="field full" key={i}><strong>Contact {i+2}</strong><div className="formGrid"><div className="field"><label>Name</label><input name={"contact_name_"+i} defaultValue={editingLead?.additional_contacts?.[i]?.name||""}/></div><div className="field"><label>Relationship</label><input name={"contact_role_"+i} placeholder="Spouse / Agent / Representative" defaultValue={editingLead?.additional_contacts?.[i]?.role||""}/></div><div className="field"><label>Phone</label><input name={"contact_phone_"+i} defaultValue={editingLead?.additional_contacts?.[i]?.phone||""}/></div><div className="field"><label>Email</label><input name={"contact_email_"+i} type="email" defaultValue={editingLead?.additional_contacts?.[i]?.email||""}/></div></div></div>)}
               </div>
               <div className="actions">
                 <button type="button" className="btn secondary" onClick={() => setShowForm(false)}>Cancel</button>
