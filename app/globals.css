@@ -70,13 +70,16 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .customerHubName{font-size:27px;line-height:1.2;margin:0 0 3px;font-weight:850;color:var(--text)}
 .customerHubAddress{font-size:25px;line-height:1.3;color:var(--text);margin:3px 0 0;font-weight:700}
 .customerHubStatus{white-space:nowrap}
-.customerHubQuickDetails{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
-.customerHubQuickDetails>div{min-width:0;display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;background:#f5f8fb}
-.customerHubQuickDetails span{color:var(--muted);font-size:11px;font-weight:600}
-.customerHubQuickDetails strong{font-size:12px;overflow-wrap:anywhere;line-height:1.4}
+.customerHubQuickDetails{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.customerHubQuickDetails>div{min-width:0;display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:8px;background:#f5f8fb}
+.customerHubQuickDetails span{color:var(--muted);font-size:15px;font-weight:600}
+.customerHubQuickDetails strong{font-size:17px;overflow-wrap:anywhere;line-height:1.45;font-weight:750}
 .customerHubBottomActions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap}
 .customerHubBottomActions .roofToolbar{margin:0;gap:7px}
 .customerHubBottomActions .btn{font-size:12px;padding:7px 12px;text-decoration:none}
 .customerHubExpanded{border-top:1px solid var(--line);margin-top:12px;padding-top:2px}
 @media(max-width:1000px){.customerHubQuickDetails{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:530px){.customerHubName{font-size:23px}.customerHubHeading{flex-wrap:wrap}.customerHubQuickDetails{gap:7px}.customerHubQuickDetails>div{padding:7px}}
+
+/* Customer details in the expanded panel should remain readable. */
+.customerHubExpanded .kpi{font-size:16px}.customerHubExpanded .kpi strong{font-size:17px;overflow-wrap:anywhere}
