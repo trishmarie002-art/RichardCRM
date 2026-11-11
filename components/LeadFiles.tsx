@@ -11,30 +11,84 @@ function category(file:Attachment){const mime=file.metadata?.mimetype||types[fil
 function ZoomablePhoto({src,alt}:{src:string;alt:string}){
  const [zoom,setZoom]=useState(1);
  const viewport=useRef<HTMLDivElement>(null);
+ const zoomRef=useRef(1);
  const drag=useRef<{x:number;y:number;left:number;top:number}|null>(null);
- function setScale(next:number){
-  setZoom(Math.min(5,Math.max(1,Math.round(next*100)/100)));
+ const pointers=useRef(new Map<number,{x:number;y:number}>());
+ const pinch=useRef<{distance:number;zoom:number}|null>(null);
+ const clamp=(v:number)=>Math.max(1,Math.min(8,Math.round(v*100)/100));
+ function changeZoom(value:number,clientX?:number,clientY?:number){
+  const node=viewport.current;
+  const next=clamp(value),previous=zoomRef.current;
+  if(next===previous)return;
+  const rect=node?.getBoundingClientRect();
+  const px=rect?(clientX??rect.left+rect.width/2)-rect.left:0;
+  const py=rect?(clientY??rect.top+rect.height/2)-rect.top:0;
+  const left=node?.scrollLeft||0,top=node?.scrollTop||0;
+  zoomRef.current=next;setZoom(next);
+  if(node)requestAnimationFrame(()=>{
+   node.scrollLeft=(left+px)*(next/previous)-px;
+   node.scrollTop=(top+py)*(next/previous)-py;
+  });
+ }
+ function reset(){
+  drag.current=null;pointers.current.clear();pinch.current=null;
+  zoomRef.current=1;setZoom(1);
+  if(viewport.current){viewport.current.scrollLeft=0;viewport.current.scrollTop=0;}
  }
  return <div className="customerPhotoViewer">
-  <div className="roofToolbar" style={{margin:"12px 0"}}>
-   <button type="button" className="mini" onClick={()=>setScale(zoom-0.5)} disabled={zoom<=1} aria-label="Zoom out">− Zoom out</button>
+  <div className="roofToolbar" style={{margin:"12px 0",alignItems:"center"}}>
+   <button type="button" className="mini" onClick={()=>changeZoom(zoomRef.current/1.4)} disabled={zoom<=1} aria-label="Zoom out">− Zoom out</button>
    <strong aria-live="polite">{Math.round(zoom*100)}%</strong>
-   <button type="button" className="mini" onClick={()=>setScale(zoom+0.5)} disabled={zoom>=5} aria-label="Zoom in">+ Zoom in</button>
-   <button type="button" className="mini" onClick={()=>{setZoom(1);if(viewport.current){viewport.current.scrollTop=0;viewport.current.scrollLeft=0;}}}>Reset</button>
+   <button type="button" className="mini" onClick={()=>changeZoom(zoomRef.current*1.4)} disabled={zoom>=8} aria-label="Zoom in">+ Zoom in</button>
+   <button type="button" className="mini" onClick={reset}>Reset</button>
    <a className="mini" href={src} target="_blank" rel="noreferrer">Open full size</a>
   </div>
-  <div ref={viewport} className="customerPhotoViewport" onPointerDown={event=>{
-   if(zoom===1||!viewport.current||event.pointerType==="touch")return;
-   drag.current={x:event.clientX,y:event.clientY,left:viewport.current.scrollLeft,top:viewport.current.scrollTop};
-   event.currentTarget.setPointerCapture(event.pointerId);
-  }} onPointerMove={event=>{
-   if(!drag.current||!viewport.current)return;
-   viewport.current.scrollLeft=drag.current.left-(event.clientX-drag.current.x);
-   viewport.current.scrollTop=drag.current.top-(event.clientY-drag.current.y);
-  }} onPointerUp={()=>{drag.current=null;}} onPointerCancel={()=>{drag.current=null;}}>
-   <img src={src} alt={alt} draggable={false} style={{display:"block",width:zoom===1?"100%":(zoom*100)+"%",maxWidth:"none",height:"auto",objectFit:"contain",userSelect:"none"}}/>
+  <div ref={viewport} className="customerPhotoViewport" role="region" aria-label={"Zoomable photo: "+alt} tabIndex={0}
+   onWheel={event=>{
+    if(event.ctrlKey||event.metaKey||event.shiftKey||Math.abs(event.deltaY)>0){
+     event.preventDefault();
+     changeZoom(zoomRef.current*(event.deltaY<0?1.16:1/1.16),event.clientX,event.clientY);
+    }
+   }}
+   onDoubleClick={event=>changeZoom(zoomRef.current>=4?1:zoomRef.current*2,event.clientX,event.clientY)}
+   onPointerDown={event=>{
+    if(event.pointerType==="mouse"&&event.button!==0)return;
+    const node=viewport.current;if(!node)return;
+    pointers.current.set(event.pointerId,{x:event.clientX,y:event.clientY});
+    node.setPointerCapture(event.pointerId);
+    if(pointers.current.size===2){
+     const [first,second]=Array.from(pointers.current.values());
+     pinch.current={distance:Math.hypot(first.x-second.x,first.y-second.y),zoom:zoomRef.current};
+     drag.current=null;
+    }else if(zoomRef.current>1){
+     drag.current={x:event.clientX,y:event.clientY,left:node.scrollLeft,top:node.scrollTop};
+    }
+   }}
+   onPointerMove={event=>{
+    if(!pointers.current.has(event.pointerId))return;
+    pointers.current.set(event.pointerId,{x:event.clientX,y:event.clientY});
+    if(pointers.current.size===2&&pinch.current){
+     const [first,second]=Array.from(pointers.current.values());
+     const distance=Math.hypot(first.x-second.x,first.y-second.y);
+     const centerX=(first.x+second.x)/2,centerY=(first.y+second.y)/2;
+     if(pinch.current.distance>0)changeZoom(pinch.current.zoom*distance/pinch.current.distance,centerX,centerY);
+     return;
+    }
+    if(drag.current&&viewport.current){
+     viewport.current.scrollLeft=drag.current.left-(event.clientX-drag.current.x);
+     viewport.current.scrollTop=drag.current.top-(event.clientY-drag.current.y);
+    }
+   }}
+   onPointerUp={event=>{pointers.current.delete(event.pointerId);drag.current=null;pinch.current=null;}}
+   onPointerCancel={event=>{pointers.current.delete(event.pointerId);drag.current=null;pinch.current=null;}}
+   onKeyDown={event=>{
+    if(event.key==="+"||event.key==="="){event.preventDefault();changeZoom(zoomRef.current*1.4);}
+    if(event.key==="-"){event.preventDefault();changeZoom(zoomRef.current/1.4);}
+    if(event.key==="0"){event.preventDefault();reset();}
+   }}>
+   <img src={src} alt={alt} draggable={false} style={{display:"block",width:(zoom*100)+"%",maxWidth:"none",height:"auto",objectFit:"contain",userSelect:"none",pointerEvents:"none"}}/>
   </div>
-  <p className="small muted">Use Zoom in / Zoom out to inspect details. Drag the enlarged photo to move around it, or scroll within the viewer.</p>
+  <p className="small muted">Scroll over the photo to zoom toward the pointer, then click and drag to move around. On touchscreens, pinch to zoom and drag with one finger. Double-click to zoom; Reset returns to 100%.</p>
  </div>;
 }
 export default function LeadFiles({leads,userId,initialLeadId="",initialFilter="All",onSelect}:{leads:Lead[];userId:string|null;initialLeadId?:string;initialFilter?:"All"|"Photos"|"Videos"|"Documents";onSelect?:(id:string)=>void}){
