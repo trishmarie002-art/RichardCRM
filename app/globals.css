@@ -110,3 +110,16 @@ button:disabled{opacity:.5;cursor:not-allowed}
 
 /* Compact roof report preview in the CRM; the print window defines its own image size. */
 .roofReportMapBlock .roofReportMap{display:block;width:300px;max-width:100%;height:auto;margin:10px auto;border:1px solid #cbd5e1;border-radius:6px}
+
+/* Seven-day roofing weather forecast */
+.weatherForecastGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-top:16px}
+.weatherDayCard{background:#f8fafc;border:1px solid #d7e2ee;border-radius:12px;padding:17px;min-width:0}
+.weatherDayDate{font-size:15px;font-weight:750;color:#17324d;margin:0 0 10px}
+.weatherDayIcon{font-size:38px;line-height:1.4;margin:0 0 8px}
+.weatherDayCard h3{font-size:15px;line-height:1.35;margin:0 0 10px;color:#243f54;min-height:40px}
+.weatherDayCard p{font-size:13px;line-height:1.55;margin:5px 0;color:#384e61}
+.weatherDayCard .weatherTemp{display:flex;align-items:baseline;gap:12px;margin:12px 0}
+.weatherTemp strong{font-size:28px;line-height:1.1;color:#172d46}
+.weatherTemp span{font-size:13px;color:#60768a}
+.weatherDayCard .weatherWorkNote{margin-top:14px;padding:10px;border-radius:8px;background:#e9f0f7;color:#26435b;font-weight:650;min-height:64px}
+@media(max-width:540px){.weatherForecastGrid{grid-template-columns:1fr}.weatherDayCard .weatherWorkNote{min-height:0}}
