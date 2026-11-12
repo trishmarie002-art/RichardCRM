@@ -153,7 +153,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
 
   return <div className="card">
     <h2>Customer estimates</h2>
-    <div className="field" style={{marginBottom:16}}><label htmlFor="estimate-template-choice">Choose estimate template</label><select id="estimate-template-choice" value={templateMode} onChange={event=>setTemplateMode(event.target.value as "standard"|"roof-comparison")}><option value="standard">Standard itemized estimate</option><option value="roof-comparison">Roof Estimate — 3 Tab vs. 30 Year Laminate (Belle Village style)</option></select></div>
+    <div className="field" style={{marginBottom:16}}><label htmlFor="estimate-template-choice">Choose estimate template</label><select id="estimate-template-choice" value={templateMode} onChange={event=>setTemplateMode(event.target.value as "standard"|"roof-comparison")}><option value="standard">Standard itemized estimate</option><option value="roof-comparison">Roof Estimate — 3 Tab vs. 30 Year Laminate</option></select></div>
     {templateMode==="roof-comparison"?<RoofEstimateWorksheet key={customerId||initialCustomerId||"general"} customers={customers} cloudMode={cloudMode} userId={userId} initialCustomerId={customerId||initialCustomerId}/>:<>
     <h2>Roofing estimate builder</h2>
     <div className="field"><label htmlFor="estimate-customer">Customer / property</label><select id="estimate-customer" disabled={busy} value={customerId} onChange={event=>setCustomerId(event.target.value)}><option value="">Choose a customer</option>{customers.map(item=><option key={item.id} value={item.id}>{item.name} — {item.address}</option>)}</select></div>
