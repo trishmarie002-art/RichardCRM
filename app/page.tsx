@@ -236,6 +236,18 @@ export default function Home() {
             setSections(first.sections||[]);setEdges(first.edges||[]);setWaste(Number(first.waste_percent??10));
             setEditingMeasurementId(first.id);
           }
+          try{
+            const draftText=localStorage.getItem("richardcrm.measurement-failed-save."+selectedLeadId);
+            if(draftText){
+              const draft=JSON.parse(draftText) as {sections?:RoofSection[];edges?:RoofEdge[];waste?:number;editingId?:string};
+              if(Array.isArray(draft.sections)&&draft.sections.length){
+                setSections(draft.sections);setEdges(Array.isArray(draft.edges)?draft.edges:[]);
+                setWaste(Number.isFinite(draft.waste)?draft.waste!:10);
+                setEditingMeasurementId(draft.editingId&&records.some(item=>item.id===draft.editingId)?draft.editingId:"");
+                setMeasurementMessage("Recovered a locally backed-up roof diagram after an earlier failed save. The tracing is NOT saved in the cloud yet. Click Save Measurement again and check the confirmation.");
+              }
+            }
+          }catch{setMeasurementMessage("A locally backed-up diagram could not be read. Do not clear browser storage.");}
         }else{
           const saved=localStorage.getItem("richardcrm.measurements.local."+selectedLeadId);
           if(saved){
@@ -489,8 +501,14 @@ export default function Home() {
       const current:SavedRoofMeasurement={id:savedId,created_at:createdAt,sections:sections.map(section=>({...section})),edges:completeEdges.map(edge=>({...edge})),waste_percent:waste};
       setEditingMeasurementId(savedId);
       setSavedMeasurements(old=>[current,...old.filter(item=>item.id!==savedId)].sort((a,b)=>b.created_at.localeCompare(a.created_at)));
+      localStorage.removeItem("richardcrm.measurement-failed-save."+selectedLeadId);
       setMeasurementMessage((editingMeasurementId?"Saved changes to the existing roof measurement.":"New roof measurement saved.")+(omittedEdges?` ${omittedEdges} incomplete edge(s) without measured lengths were not included. Complete them and save again if needed.`:""));
-    } catch (error) { setAuthError(error instanceof Error ? error.message : "Unable to save measurement."); }
+    } catch (error) {
+      const detail=error instanceof Error?error.message:"Unable to save measurement.";
+      try{localStorage.setItem("richardcrm.measurement-failed-save."+selectedLeadId,JSON.stringify({sections,edges,waste,editingId:editingMeasurementId,backedUpAt:new Date().toISOString()}));}catch{}
+      setMeasurementMessage("Roof diagram NOT saved to cloud: "+detail+". Your tracing has been backed up in this browser so you can retry. Do not clear browser storage.");
+      setAuthError("Roof diagram could not be saved: "+detail);
+    }
     finally { setSyncing(false); }
   }
 
