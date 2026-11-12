@@ -17,7 +17,6 @@ import CustomerWorkspace from "@/components/CustomerWorkspace";
 import CustomerHub from "@/components/CustomerHub";
 import EstimateBuilder from "@/components/EstimateBuilder";
 import EstimateTemplateLibrary from "@/components/EstimateTemplateLibrary";
-import RoofEstimateWorksheet from "@/components/RoofEstimateWorksheet";
 import SentEstimates from "@/components/SentEstimates";
 import RoofMap, { type RoofPoint } from "@/components/RoofMap";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -564,7 +563,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Message Templates", "Estimate Templates", "Roof Estimate Worksheet", "Weather"].map((item) => (
+          {["Dashboard", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Message Templates", "Estimate Templates", "Weather"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);if(item==="Customer Page"){setCustomerHubId("");setSearch("");}setTab(item);}}>
               {item}
             </button>
@@ -703,7 +702,6 @@ export default function Home() {
         {tab === "Follow-ups" && <FollowUps customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);setTab(target);}}/>}
         {tab === "Message Templates" && <MessageTemplates customers={leads} userId={userId} initialCustomerId={customerContext}/>}
         {tab === "Estimate Templates" && <EstimateTemplateLibrary customers={leads} userId={userId} cloudMode={cloudMode} onOpenBuilder={(id,useRoofComparison=false)=>{setCustomerContext(id);setEstimateOption(null);setEstimateWorksheetMode(useRoofComparison);setTab("Estimates");}}/>}
-        {tab === "Roof Estimate Worksheet" && <RoofEstimateWorksheet customers={leads} userId={userId} cloudMode={cloudMode}/>}
         {tab === "Lead Files" && <LeadFiles leads={leads} userId={userId} initialLeadId={customerContext} onSelect={setCustomerContext}/>}
         {tab === "Calendar" && <Calendar customers={leads} userId={userId} cloudMode={cloudMode} onOpen={(target,customer,day)=>{if(customer)setCustomerContext(customer);if(day)setCalendarDay(day);setTab(target);}}/>}
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
