@@ -46,6 +46,7 @@ const calc=(s:Scenario)=>{const materials=s.materials.reduce((x,row)=>x+row.qty*
 const valid=(s:Sheet)=>["a","b"].every(side=>{const v=s[side as "a"|"b"];return [...v.materials,...v.labor].every(r=>r.name.trim()&&Number.isFinite(r.qty)&&r.qty>=0&&Number.isFinite(r.price)&&r.price>=0)&&["misc","delivery","eagleview","payout","deductible","cash","discount","supplement","tax"].every(k=>Number.isFinite(v[k as keyof Pick<Scenario,"misc"|"delivery"|"eagleview"|"payout"|"deductible"|"cash"|"discount"|"supplement"|"tax">]));});
 export default function RoofEstimateWorksheet({userId,cloudMode,customers,initialCustomerId="",onCustomerChange,onEstimateSaved}:{userId:string|null;cloudMode:boolean;customers:Customer[];initialCustomerId?:string;onCustomerChange?:(id:string)=>void;onEstimateSaved?:()=>void}){
  const db=useMemo(()=>createClient(),[]);const [sheet,setSheet]=useState<Sheet>(initialSheet);
+ const [selectedRoofOption,setSelectedRoofOption]=useState<"a"|"b">("a");
  const [name,setName]=useState("Roof Estimate — 3 Tab vs. 30 Year Laminate");const [property,setProperty]=useState(customers.find(c=>c.id===initialCustomerId)?.address||"");const [customerId,setCustomerId]=useState(initialCustomerId);const [saved,setSaved]=useState<RecordRow[]>([]);const [selected,setSelected]=useState("");const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
  const key="richardcrm.roof-worksheet-drafts.v1";
  useEffect(()=>{let active=true;async function load(){try{if(cloudMode){if(!db||!userId)throw Error("Sign in to load saved estimate drafts.");const all:RecordRow[]=[];for(let i=0;;i+=1000){const {data,error}=await db.from("roof_estimate_worksheets").select("id,name,property_address,lead_id,worksheet,updated_at").order("updated_at",{ascending:false}).range(i,i+999);if(error)throw error;all.push(...data as RecordRow[]);if(data.length<1000)break;}if(active)setSaved(all);}else{const value=localStorage.getItem(key);if(active)setSaved(value?JSON.parse(value):[]);}}catch(e){if(active)setMessage(e instanceof Error?e.message:"Unable to load saved estimate drafts.");}}void load();return()=>{active=false;};},[db,cloudMode,userId]);
@@ -101,5 +102,20 @@ export default function RoofEstimateWorksheet({userId,cloudMode,customers,initia
  <h3 style={{marginTop:24}}>Job expenses and revenue</h3><div style={{overflowX:"auto"}}><table className="table" style={{minWidth:650}}><thead><tr><th>Field</th><th>3 Tab</th><th>30 Year Laminate</th></tr></thead><tbody>{adjustments.map(([field,label])=><tr key={field}><td>{label}</td>{(["a","b"] as const).map(side=><td key={side}><input aria-label={side+" "+label} type="number" step="any" style={{maxWidth:170}} value={sheet[side][field]} onChange={e=>changeNumber(side,field,e.target.value)}/></td>)}</tr>)}</tbody></table></div>
  <h3 style={{marginTop:24}}>Comparison and profit</h3><div style={{overflowX:"auto"}}><table className="table" style={{minWidth:650}}><thead><tr><th>Calculation</th><th>3 Tab</th><th>30 Year Laminate</th></tr></thead><tbody>{summary.map(([label,key])=><tr key={key}><td><strong>{label}</strong></td><td>{key==="margin"?first.margin.toFixed(1)+"%":usd(first[key])}</td><td>{key==="margin"?second.margin.toFixed(1)+"%":usd(second[key])}</td></tr>)}</tbody></table></div>
  <div className="field" style={{marginTop:12,maxWidth:290}}><label htmlFor="profit-split">Profit split — first share (%)</label><input id="profit-split" type="number" min="0" max="100" value={sheet.profitSplit} onChange={e=>setSheet(old=>({...old,profitSplit:Math.max(0,Math.min(100,Number(e.target.value)))}))}/></div><p><strong>3 Tab:</strong> {sheet.profitSplit}% = {usd(first.profit*sheet.profitSplit/100)}; {100-sheet.profitSplit}% = {usd(first.profit*(100-sheet.profitSplit)/100)}</p><p><strong>30 Year Laminate:</strong> {sheet.profitSplit}% = {usd(second.profit*sheet.profitSplit/100)}; {100-sheet.profitSplit}% = {usd(second.profit*(100-sheet.profitSplit)/100)}</p>
- <div className="field" style={{marginTop:14}}><label htmlFor="worksheet-notes">Notes</label><textarea id="worksheet-notes" rows={4} value={sheet.notes} onChange={e=>setSheet(old=>({...old,notes:e.target.value}))}/></div><p className="small muted">Figures do not automatically estimate material quantities or determine insurance coverage. Confirm all line items and prices before using for a proposal.</p></div>;
+ <div className="field" style={{marginTop:14}}><label htmlFor="worksheet-notes">Notes</label><textarea id="worksheet-notes" rows={4} value={sheet.notes} onChange={e=>setSheet(old=>({...old,notes:e.target.value}))}/></div><p className="small muted">Figures do not automatically estimate material quantities or determine insurance coverage. Confirm all line items and prices before using for a proposal.</p>
+ <div style={{borderTop:"1px solid #cbd5e1",paddingTop:18,marginTop:20}}>
+  <h3>Save customer estimate</h3>
+  <p className="muted">Choose the roofing option to save as a Draft in this customer's Estimates list.</p>
+  <div className="roofToolbar" style={{alignItems:"end",gap:12}}>
+   <div className="field" style={{minWidth:220,flex:"1 1 240px"}}>
+    <label htmlFor="roof-estimate-save-option">Roofing option</label>
+    <select id="roof-estimate-save-option" value={selectedRoofOption} onChange={event=>setSelectedRoofOption(event.target.value as "a"|"b")}>
+     <option value="a">3 Tab — {usd(first.revenue)}</option>
+     <option value="b">30 Year Laminate — {usd(second.revenue)}</option>
+    </select>
+   </div>
+   <button type="button" className="btn" disabled={busy||!customerId} onClick={()=>void createCustomerEstimate(selectedRoofOption)}>{busy?"Saving…":"Save Estimate"}</button>
+  </div>
+  {!customerId&&<p className="small muted">Select a customer above to enable Save Estimate.</p>}
+ </div></div>;
 }
