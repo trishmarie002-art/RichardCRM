@@ -18,6 +18,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
   const supabase = useMemo(() => createClient(), []);
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [templateMode,setTemplateMode]=useState<"standard"|"roof-comparison">(initialWorksheet?"roof-comparison":"standard");
+  const [historyRevision,setHistoryRevision]=useState(0);
   const [items, setItems] = useState<Item[]>([]);
   const [notes, setNotes] = useState("");
   const [warranty,setWarranty]=useState("");
@@ -50,7 +51,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
     }
     void load();
     return () => { active = false; };
-  }, [customerId, cloudMode, supabase, userId, initialOption, initialCustomerId]);
+  }, [customerId, cloudMode, supabase, userId, initialOption, initialCustomerId, historyRevision]);
 
   async function useMeasurement() {
     if (!customer) return;
@@ -133,7 +134,8 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
     setItems(record.items.map(item=>({...item,id:crypto.randomUUID()})));
     setNotes(record.notes);
     setWarranty(record.proposal?.warranty||"");setExclusions(record.proposal?.exclusions||"");setPaymentTerms(record.proposal?.paymentTerms||"");
-    setMessage("Saved estimate copied into the builder. Make your changes and Save estimate to create a new Draft; the original quote stays unchanged.");
+    setTemplateMode("standard");
+    setMessage("Saved estimate copied into the standard builder. Make your changes and Save estimate to create a new Draft; the original quote stays unchanged.");
   }
 
   function printEstimate(record: Estimate) {
@@ -154,7 +156,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
   return <div className="card">
     <h2>Customer estimates</h2>
     <div className="field" style={{marginBottom:16}}><label htmlFor="estimate-template-choice">Choose estimate template</label><select id="estimate-template-choice" value={templateMode} onChange={event=>setTemplateMode(event.target.value as "standard"|"roof-comparison")}><option value="standard">Standard itemized estimate</option><option value="roof-comparison">Roof Estimate — 3 Tab vs. 30 Year Laminate</option></select></div>
-    {templateMode==="roof-comparison"?<RoofEstimateWorksheet key={customerId||initialCustomerId||"general"} customers={customers} cloudMode={cloudMode} userId={userId} initialCustomerId={customerId||initialCustomerId}/>:<>
+    {templateMode==="roof-comparison"?<RoofEstimateWorksheet key={customerId||initialCustomerId||"general"} customers={customers} cloudMode={cloudMode} userId={userId} initialCustomerId={customerId||initialCustomerId} onCustomerChange={setCustomerId} onEstimateSaved={()=>setHistoryRevision(v=>v+1)}/>:<>
     <h2>Roofing estimate builder</h2>
     <div className="field"><label htmlFor="estimate-customer">Customer / property</label><select id="estimate-customer" disabled={busy} value={customerId} onChange={event=>setCustomerId(event.target.value)}><option value="">Choose a customer</option>{customers.map(item=><option key={item.id} value={item.id}>{item.name} — {item.address}</option>)}</select></div>
     <div className="roofToolbar"><button className="btn secondary" disabled={!customer || !ready || busy} onClick={()=>setItems(current=>[...current,initialItem()])}>Add line item</button><button className="btn secondary" disabled={!customer || !ready || busy} onClick={useMeasurement}>Use saved roof squares</button></div>
@@ -170,6 +172,7 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
     {[{key:"warranty",label:"Warranty",value:warranty,set:setWarranty},{key:"exclusions",label:"Exclusions",value:exclusions,set:setExclusions},{key:"payment",label:"Payment terms",value:paymentTerms,set:setPaymentTerms}].map(field=><div className="field" key={field.key}><label htmlFor={"proposal-"+field.key}>{field.label}</label><textarea id={"proposal-"+field.key} value={field.value} disabled={busy} onChange={event=>field.set(event.target.value)}/></div>)}
     <div className="kpi"><span>Estimate total</span><strong>{currency(total)}</strong></div>
     <button className="btn" disabled={busy || !ready || !customer || !items.length} onClick={save}>{busy?"Working…":"Save estimate"}</button>
+    </>}
     {message && <p className="notice" role="status" style={{marginTop:16}}>{message}</p>}
     <h3 style={{marginTop:24}}>Saved estimates</h3><p className="muted">Record customer decisions here after confirming them. Status changes do not send messages, collect signatures, or update the lead pipeline.</p>
     {history.map(record=><div className="card" key={record.id} style={{marginTop:12}}>
@@ -178,7 +181,6 @@ export default function EstimateBuilder({ customers, userId, cloudMode, initialC
       {record.status_updated_at && <p className="small muted">Last status update: {new Date(record.status_updated_at).toLocaleString()}</p>}
       <div className="roofToolbar"><button className="mini" disabled={busy} onClick={()=>revise(record)}>Create revision</button><button className="mini" onClick={()=>printEstimate(record)}>Print / save PDF</button><button className="mini" disabled={busy || !record.customer.email} onClick={()=>void emailEstimate(record)}>Email estimate</button></div>
     </div>)}
-    {!history.length && <p className="muted">No saved estimates for this customer.</p>}
-    </>}
+    {!history.length && <p className="muted">{customerId?"No saved estimates for this customer.":"Choose a customer to see saved estimates."}</p>}
   </div>;
 }
