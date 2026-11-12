@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {createClient} from "@/lib/supabase/client";
+import FileThumbnail from "@/components/FileThumbnail";
 type Lead={user_id?:string;id:string;name:string;address:string};
 type Attachment={name:string;id?:string|null;created_at?:string|null;metadata?:{size?:number;mimetype?:string}};
 const bucket="customer-files";
@@ -182,13 +183,13 @@ export default function LeadFiles({leads,userId,initialLeadId="",initialFilter="
   let active=true;
   setThumbnails({});signedAt.current=0;
   if(!db||!userId||!leadId||files.length===0)return()=>{active=false;};
-  // Sign photo and PDF files for thumbnails; PDFs load only when scrolled into view.
-  const previews=files.filter(file=>category(file)==="Photos"||file.name.toLowerCase().endsWith(".pdf"));
+  // Sign every uploaded format so its visual thumbnail can load lazily on screen.
+  const previews=files;
   if(!previews.length)return()=>{active=false;};
   const paths=previews.map(file=>prefix+"/"+file.name);
   db.storage.from(bucket).createSignedUrls(paths,3600).then(({data,error})=>{
    if(!active)return;
-   if(error){setMessage("Could not load photo thumbnails: "+error.message);return;}
+   if(error){setMessage("Could not load file thumbnails: "+error.message);return;}
    const urls:Record<string,string>={};
    (data||[]).forEach((entry,index)=>{
     if(entry.signedUrl&&!entry.error)urls[previews[index].name]=entry.signedUrl;
@@ -198,6 +199,14 @@ export default function LeadFiles({leads,userId,initialLeadId="",initialFilter="
   return()=>{active=false;};
  },[db,userId,leadId,prefix,files]);
 
+ const getSpreadsheetRows=useRef(async(url:string):Promise<string[][]>=>{
+    const [response,XLSX]=await Promise.all([fetch(url),loadSpreadsheetReader()]);
+    if(!response.ok)throw Error("Could not load spreadsheet thumbnail");
+    const workbook=XLSX.read(await response.arrayBuffer(),{type:"array",cellDates:true});
+    const first=workbook.SheetNames[0];
+    if(!first)return [];
+    return XLSX.utils.sheet_to_json(workbook.Sheets[first],{header:1,defval:"",raw:false,blankrows:false}).slice(0,6).map(row=>row.slice(0,4).map(cell=>String(cell??"")));
+ }).current;
  async function loadMore(){if(!db||busy)return;setBusy(true);try{const {data,error}=await db.storage.from(bucket).list(prefix,{limit:pageSize,offset:files.length,sortBy:{column:"created_at",order:"desc"}});if(error)throw error;setFiles(current=>[...current,...data.filter(file=>file.id)] as Attachment[]);setMore(data.length===pageSize);}catch(error){setMessage(error instanceof Error?error.message:"Could not load more files.");}finally{setBusy(false);}}
  async function upload(selected:File[]){if(!db||!userId||!lead||!selected.length||busy)return;setBusy(true);setPreview(null);setSpreadsheet(null);let uploaded=0;const failures:string[]=[];for(let index=0;index<selected.length;index++){const file=selected[index];setMessage(`Uploading ${index+1} of ${selected.length}: ${file.name}`);const extension=file.name.split(".").pop()?.toLowerCase()||"";const mime=types[extension];if(!mime||file.size>50*1024*1024||file.size===0){failures.push(`${file.name}: unsupported format, empty file, or larger than 50 MB`);continue;}try{const filename=crypto.randomUUID()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const {error}=await db.storage.from(bucket).upload(prefix+"/"+filename,file,{contentType:mime,upsert:false});if(error)throw error;uploaded++;}catch(error){failures.push(file.name+": "+(error instanceof Error?error.message:"upload failed"));}}
  try{const {data,error}=await db.storage.from(bucket).list(prefix,{limit:pageSize,sortBy:{column:"created_at",order:"desc"}});if(error)throw error;setFiles(data.filter(file=>file.id) as Attachment[]);setMore(data.length===pageSize);}catch(error){failures.push("Refresh the list: "+(error instanceof Error?error.message:"could not reload"));}setMessage(`${uploaded} file${uploaded===1?"":"s"} uploaded to ${lead.name}.${failures.length?"\n"+failures.join("\n"):""}`);setBusy(false);}
@@ -231,10 +240,8 @@ const cached=thumbnails[file.name];if((category(file)==="Photos"||file.name.toLo
  const visible=files.filter(file=>filter==="All"||category(file)===filter);
  return <div className="card"><h2>Lead files & uploads</h2><p className="muted">Keep each lead’s roof photos, inspection videos and documents together. Existing Customer Workspace uploads appear here too.</p><div className="field"><label htmlFor="files-lead">Lead / property</label><select id="files-lead" value={leadId} disabled={busy} onChange={event=>{setLeadId(event.target.value);onSelect?.(event.target.value);}}><option value="">Choose a lead</option>{leads.map(item=><option key={item.id} value={item.id}>{item.name} — {item.address}</option>)}</select></div>{lead&&<><div className="field" style={{marginTop:16}}><label htmlFor="lead-upload">Upload photos, videos, PDFs or Excel files · up to 50 MB per file</label><input id="lead-upload" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.mov,.webm,.m4v,.xls,.xlsx,.csv" disabled={busy||loading||!ready} onChange={event=>{const selected=Array.from(event.target.files||[]);event.target.value="";void upload(selected);}}/></div><p className="small muted">JPG, PNG, WebP, PDF, Excel (XLS/XLSX), CSV, MP4, MOV, WebM and M4V. You can select multiple files. Video playback depends on your browser’s codec support.</p><div className="roofToolbar"><div className="field"><label htmlFor="file-filter">Show</label><select id="file-filter" value={filter} onChange={event=>setFilter(event.target.value as "All"|"Photos"|"Videos"|"Documents")}>{["All","Photos","Videos","Documents"].map(kind=><option key={kind}>{kind}</option>)}</select></div><button className="mini" disabled={busy||loading} onClick={()=>setRefresh(value=>value+1)}>Refresh files</button></div></>}{message&&<p className="notice" role="status" style={{whiteSpace:"pre-wrap"}}>{message}</p>}{loading&&<p role="status">Loading this lead’s files…</p>}{(preview||spreadsheet)&&<div ref={previewTop} className="card" style={{marginTop:16,scrollMarginTop:16}}><h3>{displayName((preview?.file||spreadsheet!.file).name)}</h3><button className="mini" onClick={()=>{setPreview(null);setSpreadsheet(null);}}>Close preview</button>{spreadsheet?<SpreadsheetViewer key={spreadsheet.file.name} preview={spreadsheet}/>:preview&&category(preview!.file)==="Photos"?<ZoomablePhoto key={preview!.url} src={preview!.url} alt={displayName(preview!.file.name)}/>:category(preview!.file)==="Videos"?<video key={preview!.url} controls preload="metadata" src={preview!.url} style={{width:"100%",maxHeight:600,marginTop:16}}/>:preview!.file.name.toLowerCase().endsWith(".pdf")?<><iframe title={"PDF preview: "+displayName(preview!.file.name)} src={preview!.url+"#toolbar=1"} style={{width:"100%",height:540,border:"1px solid #cbd5e1",marginTop:12}}/><p><a href={preview!.url} target="_blank" rel="noreferrer" className="btn secondary">Open PDF in new tab</a></p></>:<a href={preview!.url} target="_blank" rel="noreferrer" className="btn secondary">Open document</a>}<p className="small muted">Preview access expires after one hour. Click the file thumbnail again to renew it. Files open here without saving them to your device.</p></div>}{lead&&ready&&!loading&&(visible.length?<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:12,marginTop:16}}>{visible.map(file=><div className="card" key={file.name} style={{padding:10,minWidth:0}}>
  <button type="button" disabled={busy} aria-label={"Preview "+displayName(file.name)} title={"Open "+displayName(file.name)} onClick={()=>void view(file)} style={{display:"block",width:"100%",height:118,padding:0,border:"1px solid #d1d5db",borderRadius:10,overflow:"hidden",cursor:"pointer",background:"#f3f4f6",position:"relative",marginBottom:12}}>
-  {thumbnails[file.name]&&category(file)==="Photos"?<img src={thumbnails[file.name]} alt={displayName(file.name)} loading="lazy" decoding="async" style={{height:"100%",width:"100%",objectFit:"cover"}}/>:thumbnails[file.name]&&file.name.toLowerCase().endsWith(".pdf")?<iframe loading="lazy" tabIndex={-1} aria-hidden="true" title="" src={thumbnails[file.name]+"#toolbar=0&navpanes=0&scrollbar=0"} style={{width:"100%",height:"160%",border:0,pointerEvents:"none",transform:"scale(.82)",transformOrigin:"top center"}}/>:
-   
-   <span style={{display:"flex",height:"100%",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,color:"#475569"}}>{category(file)==="Photos"?"PHOTO":category(file)==="Videos"?"VIDEO":"FILE"}</span>}
-  
+  <FileThumbnail name={file.name} type={category(file)} url={thumbnails[file.name]} spreadsheetRows={getSpreadsheetRows}/>
+ 
  </button>
  <strong style={{overflowWrap:"anywhere"}}>{displayName(file.name)}</strong><p className="small muted">{category(file)} · {file.metadata?.size!==undefined?(file.metadata.size/1024/1024).toFixed(2)+" MB":"Size unavailable"}<br/>{file.created_at?new Date(file.created_at).toLocaleString():""}</p><div className="roofToolbar"><button className="mini" disabled={busy} onClick={()=>void download(file)}>Download</button><button className="mini" disabled={busy} onClick={()=>void remove(file)}>Delete</button></div></div>)}</div>:<p className="muted">No {filter==="All"?"files":filter.toLowerCase()} in the loaded list for this lead.</p>)}{more&&<button className="btn secondary" disabled={busy||loading} onClick={()=>void loadMore()}>Load more files</button>}<p className="small muted">Files are private to approved Star Roofing CRM accounts. Remove a lead’s files before deleting that lead.</p></div>;
 }
