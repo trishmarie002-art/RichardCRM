@@ -145,7 +145,7 @@ let sheetJsPromise:Promise<SheetJs>|null=null;
 function loadSpreadsheetReader():Promise<SheetJs>{
  if(window.XLSX)return Promise.resolve(window.XLSX);
  if(sheetJsPromise)return sheetJsPromise;
- sheetJsPromise=new Promise((resolve,reject)=>{
+ sheetJsPromise=new Promise<SheetJs>((resolve,reject)=>{
   const src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
   const script=document.createElement("script");script.src=src;script.async=true;script.referrerPolicy="no-referrer";
   script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error("Spreadsheet reader did not initialize."));
