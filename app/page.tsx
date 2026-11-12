@@ -131,6 +131,7 @@ export default function Home() {
   const [customerContext,setCustomerContext]=useState("");
   const [customerHubId,setCustomerHubId]=useState("");
   const [estimateOption,setEstimateOption]=useState<{name:string;scope:string;price:number}|null>(null);
+  const [estimateWorksheetMode,setEstimateWorksheetMode]=useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState("");
   const [edges, setEdges] = useState<RoofEdge[]>([]);
   const updateFacetGeometry=useCallback((id:number,points:RoofPoint[],footprintSqFt:number)=>{
@@ -701,7 +702,7 @@ export default function Home() {
         {tab === "Customer Map" && <CustomerMap customers={leads} userId={userId} onAddLead={(address)=>{setEditingLead(null);setNewLeadAddress(address);setShowForm(true);}} onOpen={(target,id)=>{setCustomerContext(id);if(target==="Customer Page")setCustomerHubId(id);setTab(target);}}/>}
         {tab === "Follow-ups" && <FollowUps customers={leads} userId={userId} onOpen={(target,id)=>{setCustomerContext(id);setTab(target);}}/>}
         {tab === "Message Templates" && <MessageTemplates customers={leads} userId={userId} initialCustomerId={customerContext}/>}
-        {tab === "Estimate Templates" && <EstimateTemplateLibrary customers={leads} userId={userId} cloudMode={cloudMode} onOpenBuilder={id=>{setCustomerContext(id);setEstimateOption(null);setTab("Estimates");}}/>}
+        {tab === "Estimate Templates" && <EstimateTemplateLibrary customers={leads} userId={userId} cloudMode={cloudMode} onOpenBuilder={(id,useRoofComparison=false)=>{setCustomerContext(id);setEstimateOption(null);setEstimateWorksheetMode(useRoofComparison);setTab("Estimates");}}/>}
         {tab === "Roof Estimate Worksheet" && <RoofEstimateWorksheet customers={leads} userId={userId} cloudMode={cloudMode}/>}
         {tab === "Lead Files" && <LeadFiles leads={leads} userId={userId} initialLeadId={customerContext} onSelect={setCustomerContext}/>}
         {tab === "Calendar" && <Calendar customers={leads} userId={userId} cloudMode={cloudMode} onOpen={(target,customer,day)=>{if(customer)setCustomerContext(customer);if(day)setCalendarDay(day);setTab(target);}}/>}
@@ -716,7 +717,7 @@ export default function Home() {
           {!leads.some(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase()))&&<p className="muted" style={{marginTop:14}}>No matching customers.</p>}
           </div>)}
         {tab === "Customer Workspace" && <CustomerWorkspace customers={leads} userId={userId} initialCustomerId={customerContext} onSelect={setCustomerContext} onOpen={setTab} />}
-        {tab === "Estimates" && <EstimateBuilder initialOption={estimateOption} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
+        {tab === "Estimates" && <EstimateBuilder key={customerContext+"-"+String(estimateWorksheetMode)} initialWorksheet={estimateWorksheetMode} initialOption={estimateOption} customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Sent Estimates" && <SentEstimates customers={leads} userId={userId} cloudMode={cloudMode} onOpenCustomer={id=>{setCustomerContext(id);setEstimateOption(null);setTab("Estimates");}} />}
         {tab === "Roof Measure" && (
           <>
