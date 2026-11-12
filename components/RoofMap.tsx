@@ -84,9 +84,6 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       const path=facet.points!;
       const polygonOverlay=new maps.Polygon({map:map.current,paths:path,strokeColor:color,fillColor:color,fillOpacity:.12,strokeWeight:3,clickable:false,zIndex:1});
       overlays.push(polygonOverlay);
-      const perimeter=maps.geometry.spherical.computeLength([...path,path[0]])*3.280839895;
-      const label=new maps.Marker({map:map.current,position:path[0],clickable:false,label:{text:"F"+(index+1),color:"#111827",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:13,fillColor:color,fillOpacity:1,strokeColor:"#111827",strokeWeight:1},title:facet.name+" — outline perimeter "+perimeter.toFixed(1)+" ft"});
-      overlays.push(label);
       path.forEach((point,vertexIndex)=>{
         const marker=new maps.Marker({map:map.current,position:point,draggable:!drawing,clickable:!drawing,icon:{path:maps.SymbolPath.CIRCLE,scale:5,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:"Drag roof corner "+(vertexIndex+1)+" to adjust"});
         overlays.push(marker);
@@ -103,8 +100,6 @@ export default function RoofMap({ address, onFacet, onEdge, onFacetUpdate, onEdg
       const path=edge.points!;
       const overlay=new maps.Polyline({map:map.current,path,strokeColor:color,strokeWeight:4,clickable:false,zIndex:10});
       overlays.push(overlay);
-      const midpoint={lat:(path[0].lat+path[1].lat)/2,lng:(path[0].lng+path[1].lng)/2};
-      overlays.push(new maps.Marker({map:map.current,position:midpoint,clickable:false,label:{text:String(index+1),color:"#fff",fontWeight:"bold"},icon:{path:maps.SymbolPath.CIRCLE,scale:12,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:edge.kind+" "+edgeLength(edge).toFixed(1)+" ft"}));
       path.forEach((point,vertexIndex)=>{
         const marker=new maps.Marker({map:map.current,position:point,draggable:!drawing,clickable:!drawing,icon:{path:maps.SymbolPath.CIRCLE,scale:5,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:1},title:"Drag endpoint "+(vertexIndex+1)+" to adjust"});
         overlays.push(marker);
