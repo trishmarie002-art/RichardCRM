@@ -1,0 +1,19 @@
+"use client";
+import {useEffect,useMemo,useState} from "react";
+import {createClient} from "@/lib/supabase/client";
+type Item={id:string;description:string;quantity:number;rate:number};
+type Template={id:string;name:string;items:Item[]};
+type Customer={id:string;name:string;address:string};
+const money=(value:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(value);
+export default function EstimateTemplateLibrary({userId,cloudMode,customers,onOpenBuilder}:{userId:string|null;cloudMode:boolean;customers:Customer[];onOpenBuilder:(customerId:string)=>void}){
+ const db=useMemo(()=>createClient(),[]);const [templates,setTemplates]=useState<Template[]>([]);const [loading,setLoading]=useState(true);const [message,setMessage]=useState("");const [expanded,setExpanded]=useState("");const [customerId,setCustomerId]=useState("");
+ useEffect(()=>{let active=true;async function load(){setLoading(true);setMessage("");try{if(cloudMode){if(!db||!userId)throw Error("Sign in to see saved templates.");const all:Template[]=[];for(let start=0;;start+=1000){const {data,error}=await db.from("material_templates").select("id,name,items").order("name").range(start,start+999);if(error)throw error;all.push(...data as Template[]);if(data.length<1000)break;}if(active)setTemplates(all);}else{const stored=localStorage.getItem("richardcrm.material-templates.v1");if(active)setTemplates(stored?JSON.parse(stored):[]);}}catch(error){if(active)setMessage(error instanceof Error?error.message:"Could not load estimate templates.");}finally{if(active)setLoading(false);}}void load();return()=>{active=false;};},[db,cloudMode,userId]);
+ return <div className="card"><h2>Saved estimate templates</h2><p className="muted">Your reusable estimate packages are stored here, separate from customer estimates. Click a template to see its saved materials and prices. To use a package, open the customer's Estimate Builder and choose it under Reusable material templates.</p>
+ {message&&<p className="notice" role="alert">{message}</p>}
+ {loading?<p>Loading saved templates…</p>:templates.length?templates.map(template=><div className="activityItem" key={template.id} style={{marginTop:12}}>
+  <button className="mini" style={{fontWeight:750,textAlign:"left"}} type="button" aria-expanded={expanded===template.id} onClick={()=>setExpanded(v=>v===template.id?"":template.id)}>{expanded===template.id?"▼":"▶"} {template.name}</button><p className="small muted">{template.items.length} saved line items · {money(template.items.reduce((total,item)=>total+Number(item.quantity||0)*Number(item.rate||0),0))} at saved quantities</p>
+  {expanded===template.id&&<div style={{overflowX:"auto"}}><table className="table"><thead><tr><th>Material / work</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>{template.items.map((item,index)=><tr key={item.id||index}><td>{item.description}</td><td>{item.quantity}</td><td>{money(item.rate)}</td><td>{money(item.quantity*item.rate)}</td></tr>)}</tbody></table></div>}
+ </div>):<p className="muted">No saved templates found in this account.</p>}
+ <div className="field" style={{marginTop:20}}><label htmlFor="template-library-customer">Open Estimate Builder for a customer</label><select id="template-library-customer" value={customerId} onChange={event=>setCustomerId(event.target.value)}><option value="">Choose customer</option>{customers.map(customer=><option key={customer.id} value={customer.id}>{customer.address||customer.name}</option>)}</select></div><button type="button" className="btn" disabled={!customerId} onClick={()=>onOpenBuilder(customerId)}>Open Estimate Builder</button>
+ </div>;
+}
