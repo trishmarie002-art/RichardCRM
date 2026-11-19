@@ -127,7 +127,6 @@ export default function Home() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [search, setSearch] = useState("");
   const [customerListView,setCustomerListView]=useState<"Active"|"Completed"|"Lost Bids">("Active");
-  const [showPipelineLostBids,setShowPipelineLostBids]=useState(false);
   const [localReady, setLocalReady] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newLeadAddress,setNewLeadAddress]=useState("");
@@ -687,10 +686,10 @@ export default function Home() {
         )}
 
         {tab === "Pipeline" && (
-          <div>
           <div className="pipeline">
-            {statuses.map((status) => {
-              const column = leads.filter((lead) => isActivePipeline(lead) && lead.status === status);
+            {[...statuses,"Lost Bids"].map((status) => {
+              const lostColumn=status==="Lost Bids";
+              const column = leads.filter((lead) => lostColumn ? isLostBid(lead) : isActivePipeline(lead) && lead.status === status);
               return (
                 <div className="pipeCol" key={status}>
                   <div className="pipeHead"><span>{status}</span><span className="badge">{column.length}</span></div>
@@ -702,41 +701,23 @@ export default function Home() {
                       <div style={{ marginTop: 8, fontWeight: 800 }}>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</div>
                       <div className="leadActions">
                         <button className="mini" onClick={() => {setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
-                        {status !== statuses[0] && <button className="mini" onClick={() => moveLead(lead.id, -1)}>← Back</button>}
-                        {status !== statuses[statuses.length - 1] && <button className="mini" onClick={() => moveLead(lead.id, 1)}>Next →</button>}
-                        <button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,true)}>Move to Completed</button>
-                        <button className="mini" disabled={syncing} onClick={()=>void archiveLostBid(lead.id)}>Lost Bid</button>
+                        {lostColumn ? (
+                          <button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Restore to Pipeline</button>
+                        ) : (
+                          <>
+                            {status !== statuses[0] && <button className="mini" disabled={syncing} onClick={() => void moveLead(lead.id, -1)}>← Back</button>}
+                            {status !== statuses[statuses.length - 1] && <button className="mini" disabled={syncing} onClick={() => void moveLead(lead.id, 1)}>Next →</button>}
+                            <button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,true)}>Move to Completed</button>
+                            <button className="mini" disabled={syncing} onClick={()=>void archiveLostBid(lead.id)}>Lost Bid</button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
-                  {column.length === 0 && <div className="empty">No leads here yet.</div>}
+                  {column.length === 0 && <div className="empty">No {lostColumn?"lost bids":"leads"} here yet.</div>}
                 </div>
               );
             })}
-          </div>
-          <section className="pipeCol" style={{marginTop:18}} aria-label="Lost Bids pipeline section">
-            <div className="pipeHead">
-              <span>Lost Bids</span>
-              <span className="badge">{leads.filter(isLostBid).length}</span>
-              <button className="mini" type="button" aria-expanded={showPipelineLostBids} onClick={()=>setShowPipelineLostBids(v=>!v)}>{showPipelineLostBids?"Hide Lost Bids":"Show Lost Bids"}</button>
-            </div>
-            {showPipelineLostBids&&<div>
-              <p className="small muted">Archived bids are kept separate from the active pipeline.</p>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,235px),1fr))",gap:12,alignItems:"start"}}>
-                {leads.filter(isLostBid).map(lead=><div className="lead" key={lead.id}>
-                  <strong>{lead.name}</strong>
-                  <div className="meta">{lead.address}</div>
-                  <div className="meta">{lead.phone}</div>
-                  <div style={{marginTop:8,fontWeight:800}}>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</div>
-                  <div className="leadActions">
-                    <button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
-                    <button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Restore to Pipeline</button>
-                  </div>
-                </div>)}
-              </div>
-              {!leads.some(isLostBid)&&<div className="empty">No lost bids yet.</div>}
-            </div>}
-          </section>
           </div>
         )}
 
