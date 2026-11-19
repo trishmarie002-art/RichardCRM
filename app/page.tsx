@@ -714,22 +714,29 @@ export default function Home() {
               );
             })}
           </div>
-          <div className="card" style={{marginTop:18}}>
-            <div className="sectionTitle">
-              <h2>Lost Bids ({leads.filter(isLostBid).length})</h2>
-              <button className={showPipelineLostBids?"btn":"btn secondary"} type="button" aria-expanded={showPipelineLostBids} onClick={()=>setShowPipelineLostBids(v=>!v)}>{showPipelineLostBids?"Hide Lost Bids":"Show Lost Bids"}</button>
+          <section className="pipeCol" style={{marginTop:18}} aria-label="Lost Bids pipeline section">
+            <div className="pipeHead">
+              <span>Lost Bids</span>
+              <span className="badge">{leads.filter(isLostBid).length}</span>
+              <button className="mini" type="button" aria-expanded={showPipelineLostBids} onClick={()=>setShowPipelineLostBids(v=>!v)}>{showPipelineLostBids?"Hide Lost Bids":"Show Lost Bids"}</button>
             </div>
             {showPipelineLostBids&&<div>
-              <p className="muted">These bids are archived and are not counted in the active pipeline.</p>
-              {!leads.some(isLostBid)?<p className="muted">No lost bids yet.</p>:leads.filter(isLostBid).map(lead=><div className="card" key={lead.id} style={{marginTop:12}}>
-                <div className="kpi"><span><strong>{lead.name}</strong><br/>{lead.address}<br/>{lead.phone}</span><strong>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</strong></div>
-                <div className="roofToolbar">
-                  <button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
-                  <button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Restore to Pipeline</button>
-                </div>
-              </div>)}
+              <p className="small muted">Archived bids are kept separate from the active pipeline.</p>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(100%,235px),1fr))",gap:12,alignItems:"start"}}>
+                {leads.filter(isLostBid).map(lead=><div className="lead" key={lead.id}>
+                  <strong>{lead.name}</strong>
+                  <div className="meta">{lead.address}</div>
+                  <div className="meta">{lead.phone}</div>
+                  <div style={{marginTop:8,fontWeight:800}}>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</div>
+                  <div className="leadActions">
+                    <button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
+                    <button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Restore to Pipeline</button>
+                  </div>
+                </div>)}
+              </div>
+              {!leads.some(isLostBid)&&<div className="empty">No lost bids yet.</div>}
             </div>}
-          </div>
+          </section>
           </div>
         )}
 
