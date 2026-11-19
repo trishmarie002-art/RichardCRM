@@ -33,6 +33,8 @@ type Lead = {
   status: string;
   source: string;
   value: number;
+  estimate_amount?: number | null;
+  estimate_created_on?: string | null;
   notes: string;
   job_type?: string;
   salesperson?: string;
@@ -103,6 +105,8 @@ function mapDbLead(row: any): Lead {
     status: row.status ?? "New Lead",
     source: row.source ?? "Other",
     value: Number(row.potential_value ?? 0),
+    estimate_amount: row.estimate_amount == null ? null : Number(row.estimate_amount),
+    estimate_created_on: row.estimate_created_on ?? null,
     notes: row.notes ?? "",
     job_type: row.job_type ?? "Roof Replacement - Residential",
     salesperson: row.salesperson ?? "",
@@ -265,8 +269,8 @@ export default function Home() {
     void load();
     return()=>{active=false;};
   },[selectedLeadId,userId,cloudMode,supabase]);
-  const openPipeline = leads.filter((l) => l.status !== "Won" && l.status !== "Lost").reduce((sum, l) => sum + l.value, 0);
-  const wonRevenue = leads.filter((l) => l.status === "Won").reduce((sum, l) => sum + l.value, 0);
+  const openPipeline = leads.filter((l) => l.status !== "Won" && l.status !== "Lost").reduce((sum, l) => sum + Number(l.estimate_amount ?? 0), 0);
+  const wonRevenue = leads.filter((l) => l.status === "Won").reduce((sum, l) => sum + Number(l.estimate_amount ?? 0), 0);
   const inspectionCount = leads.filter((l) => l.status === "Inspection").length;
 
   const roofTotals = useMemo(() => {
@@ -324,13 +328,17 @@ export default function Home() {
   }
 
   async function addLead(formData: FormData) {
-    const amountText = String(formData.get("value") || "").trim().replace(/^\$\s*/, "");
-    if (amountText && !/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(amountText)) {
-      setAuthError("Enter a valid US dollar amount, such as $10,000 or $10,000.50."); return;
+    const amountText = String(formData.get("estimate_amount") || "").trim().replace(/^\\$\\s*/, "");
+    if (amountText && !/^(?:\\d+|\\d{1,3}(?:,\\d{3})+)(?:\\.\\d{1,2})?$/.test(amountText)) {
+      setAuthError("Enter a valid estimate amount, such as $10,000 or $10,000.50."); return;
     }
-    const jobValue = Number(amountText.replace(/,/g, "") || 0);
-    if (!Number.isFinite(jobValue) || jobValue > 9999999999.99) {
-      setAuthError("Potential job value must be between $0 and $9,999,999,999.99."); return;
+    const estimateAmount = amountText ? Number(amountText.replace(/,/g,"")) : null;
+    if (estimateAmount!==null && (!Number.isFinite(estimateAmount) || estimateAmount>9999999999.99)) {
+      setAuthError("Estimate amount must be between $0 and $9,999,999,999.99."); return;
+    }
+    const estimateDate = String(formData.get("estimate_created_on") || "").trim() || null;
+    if (estimateDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(estimateDate)) {
+      setAuthError("Choose a valid estimate-created date."); return;
     }
     const draft = {
       name: String(formData.get("name") || ""),
@@ -339,7 +347,8 @@ export default function Home() {
       address: String(formData.get("address") || ""),
       status: editingLead?.status || "New Lead",
       source: String(formData.get("source") || "Other"),
-      potential_value: jobValue,
+      estimate_amount: estimateAmount,
+      estimate_created_on: estimateDate,
       notes: String(formData.get("notes") || ""),
       job_type: String(formData.get("job_type") || "Roof Replacement - Residential"),
       salesperson: String(formData.get("salesperson") || "").trim(),
@@ -358,7 +367,7 @@ export default function Home() {
         const saved = mapDbLead(data);
         setLeads(current=>editingLead?current.map(item=>item.id===saved.id?saved:item):[saved,...current]);
       } else {
-        const saved: Lead = {...draft,id:editingLead?.id || crypto.randomUUID(),value:draft.potential_value};
+        const saved: Lead = {...draft,id:editingLead?.id || crypto.randomUUID(),value:editingLead?.value||0};
         setLeads(current=>editingLead?current.map(item=>item.id===saved.id?saved:item):[saved,...current]);
       }
       setShowForm(false); setEditingLead(null); setNewLeadAddress(""); setAuthError("");
@@ -607,12 +616,12 @@ export default function Home() {
               <div className="card">
                 <div className="statTitle">Open Pipeline</div>
                 <div className="statValue">{money(openPipeline)}</div>
-                <div className="statFoot">Potential revenue still in progress</div>
+                <div className="statFoot">Total of manually entered estimate amounts for open leads</div>
               </div>
               <div className="card">
                 <div className="statTitle">Won Lead Value</div>
                 <div className="statValue">{money(wonRevenue)}</div>
-                <div className="statFoot">Potential value of won leads; payments shown below</div>
+                <div className="statFoot">Estimate amounts for won leads; payments shown below</div>
               </div>
             </div>
 
@@ -625,7 +634,7 @@ export default function Home() {
               <div className="tableWrap">
                 <table className="table">
                   <thead>
-                    <tr><th>Customer</th><th>Address</th><th>Status</th><th>Source</th><th>Potential</th></tr>
+                    <tr><th>Customer</th><th>Address</th><th>Status</th><th>Source</th><th>Estimate Amount</th></tr>
                   </thead>
                   <tbody>
                     {leads.slice(0, 8).map((lead) => (
@@ -634,7 +643,7 @@ export default function Home() {
                         <td>{lead.address}</td>
                         <td><span className="badge">{lead.status}</span></td>
                         <td>{lead.source}</td>
-                        <td>{money(lead.value)}</td>
+                        <td>{lead.estimate_amount==null?"Not entered":money(lead.estimate_amount)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -656,7 +665,7 @@ export default function Home() {
                       <strong>{lead.name}</strong>
                       <div className="meta">{lead.address}</div>
                       <div className="meta">{lead.phone}</div>
-                      <div style={{ marginTop: 8, fontWeight: 800 }}>{money(lead.value)}</div>
+                      <div style={{ marginTop: 8, fontWeight: 800 }}>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</div>
                       <div className="leadActions">
                         {status !== statuses[0] && <button className="mini" onClick={() => moveLead(lead.id, -1)}>← Back</button>}
                         {status !== statuses[statuses.length - 1] && <button className="mini" onClick={() => moveLead(lead.id, 1)}>Next →</button>}
@@ -709,7 +718,7 @@ export default function Home() {
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} initialDay={calendarDay} />}
-        {tab === "Customer Page" && (customerHubId && leads.some(lead=>lead.id===customerHubId) ? <CustomerHub key={customerHubId} customer={leads.find(lead=>lead.id===customerHubId)!} userId={userId} cloudMode={cloudMode} onBack={()=>setTab("Customers")} onEdit={()=>{setEditingLead(leads.find(lead=>lead.id===customerHubId)!);setShowForm(true);}} onMeasure={()=>{setSelectedLeadId(customerHubId);setTab("Roof Measure");}} /> : <div className="card"><h2>Select a customer property</h2><p className="muted">Choose the property whose records you want to open. No customer is selected by default.</p>
+        {tab === "Customer Page" && (customerHubId && leads.some(lead=>lead.id===customerHubId) ? <CustomerHub key={customerHubId} customer={leads.find(lead=>lead.id===customerHubId)!} userId={userId} cloudMode={cloudMode} onEstimateSaved={(date,amount)=>setLeads(current=>current.map(lead=>lead.id===customerHubId?{...lead,estimate_created_on:date,estimate_amount:amount}:lead))} onBack={()=>setTab("Customers")} onEdit={()=>{setEditingLead(leads.find(lead=>lead.id===customerHubId)!);setShowForm(true);}} onMeasure={()=>{setSelectedLeadId(customerHubId);setTab("Roof Measure");}} /> : <div className="card"><h2>Select a customer property</h2><p className="muted">Choose the property whose records you want to open. No customer is selected by default.</p>
           <div className="field"><label htmlFor="customer-page-search">Search properties or customer names</label><input id="customer-page-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search address, name, email or phone" /></div>
           <div className="tableWrap" style={{marginTop:16}}><table className="table"><thead><tr><th>Property</th><th>Customer</th><th>Status</th><th>Action</th></tr></thead><tbody>
           {leads.filter(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map(lead=><tr key={lead.id}><td><strong>{lead.address||"Address not provided"}</strong></td><td>{lead.name}</td><td>{lead.completed_at?"Completed":lead.status}</td><td><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);}}>Open Page</button></td></tr>)}
@@ -842,7 +851,8 @@ export default function Home() {
                     <option>Facebook</option><option>Google</option><option>Referral</option><option>Door Knock</option><option>Other</option>
                   </select>
                 </div>
-                <div className="field"><label htmlFor="potential-job-value">Potential job value (USD)</label><div style={{display:"flex",alignItems:"center",gap:8}}><span aria-hidden="true">$</span><input id="potential-job-value" name="value" type="text" inputMode="decimal" placeholder="10,000.00" defaultValue={editingLead ? editingLead.value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}) : ""} onBlur={event=>{const raw=event.currentTarget.value.trim().replace(/^\$\s*/,"");if(raw&&/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(raw)){const value=Number(raw.replace(/,/g,""));if(Number.isFinite(value)&&value<=9999999999.99)event.currentTarget.value=value.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}}} style={{flex:1,minWidth:0}}/></div></div>
+                 <div className="field"><label htmlFor="customer-estimate-date">Estimate created (date)</label><input id="customer-estimate-date" name="estimate_created_on" type="date" defaultValue={editingLead?.estimate_created_on||""}/></div>
+                 <div className="field"><label htmlFor="customer-estimate-amount">Estimate amount ($)</label><input id="customer-estimate-amount" name="estimate_amount" type="number" min="0" max="9999999999.99" step="0.01" placeholder="Enter estimate amount" defaultValue={editingLead?.estimate_amount??""}/></div>
                 <div className="field full"><label>Summary notes (dated notes can be added on the Customer Page)</label><textarea name="notes" defaultValue={editingLead?.notes || ""} /></div>
                 <div className="field full"><h3>Additional contacts</h3><p className="muted">Optional spouse, real estate agent, or third-party representative.</p></div>
                 {[0,1,2].map(i=><div className="field full" key={i}><strong>Contact {i+2}</strong><div className="formGrid"><div className="field"><label>Name</label><input name={"contact_name_"+i} defaultValue={editingLead?.additional_contacts?.[i]?.name||""}/></div><div className="field"><label>Relationship</label><input name={"contact_role_"+i} placeholder="Spouse / Agent / Representative" defaultValue={editingLead?.additional_contacts?.[i]?.role||""}/></div><div className="field"><label>Phone</label><input name={"contact_phone_"+i} defaultValue={editingLead?.additional_contacts?.[i]?.phone||""}/></div><div className="field"><label>Email</label><input name={"contact_email_"+i} type="email" defaultValue={editingLead?.additional_contacts?.[i]?.email||""}/></div></div></div>)}
