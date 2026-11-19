@@ -53,7 +53,9 @@ type RoofSection = {
   points?: RoofPoint[];
 };
 
-const statuses = ["New Lead", "Inspection", "Estimate Sent", "Won", "Lost"];
+const statuses = ["New Lead", "Inspection", "Estimate Sent", "Won"];
+const isLostBid = (lead:Lead) => lead.status === "Lost" && !lead.completed_at;
+const isActivePipeline = (lead:Lead) => !lead.completed_at && !isLostBid(lead);
 
 const starterLeads: Lead[] = [
   {
@@ -269,8 +271,8 @@ export default function Home() {
     void load();
     return()=>{active=false;};
   },[selectedLeadId,userId,cloudMode,supabase]);
-  const openPipeline = leads.filter((l) => l.status !== "Won" && l.status !== "Lost").reduce((sum, l) => sum + Number(l.estimate_amount ?? 0), 0);
-  const wonRevenue = leads.filter((l) => l.status === "Won").reduce((sum, l) => sum + Number(l.estimate_amount ?? 0), 0);
+  const openPipeline = leads.filter(isActivePipeline).reduce((sum, l) => sum + Number(l.estimate_amount ?? 0), 0);
+  const wonRevenue = leads.filter((l) => l.status === "Won" || Boolean(l.completed_at)).reduce((sum, l) => sum + Number(l.estimate_amount ?? 0), 0);
   const inspectionCount = leads.filter((l) => l.status === "Inspection").length;
 
   const roofTotals = useMemo(() => {
@@ -390,10 +392,40 @@ export default function Home() {
     finally{setSyncing(false);}
   }
 
+  async function archiveLostBid(id:string){
+    const lead=leads.find(item=>item.id===id);
+    if(!lead||syncing||!window.confirm("Move "+lead.name+" to Lost Bids? This keeps the customer and its records, and removes it from the active pipeline."))return;
+    setSyncing(true);setAuthError("");
+    try{
+      if(cloudMode){
+        if(!supabase||!userId)throw new Error("Sign in first.");
+        const {error}=await supabase.from("leads").update({status:"Lost",completed_at:null,updated_at:new Date().toISOString()}).eq("id",id).select("id").single();
+        if(error)throw error;
+      }
+      setLeads(current=>current.map(item=>item.id===id?{...item,status:"Lost",completed_at:null}:item));
+    }catch(error){setAuthError(error instanceof Error?error.message:"Could not move this bid.");}
+    finally{setSyncing(false);}
+  }
+
+  async function restoreLostBid(id:string){
+    if(syncing)return;
+    setSyncing(true);setAuthError("");
+    try{
+      if(cloudMode){
+        if(!supabase||!userId)throw new Error("Sign in first.");
+        const {error}=await supabase.from("leads").update({status:"New Lead",completed_at:null,updated_at:new Date().toISOString()}).eq("id",id).select("id").single();
+        if(error)throw error;
+      }
+      setLeads(current=>current.map(item=>item.id===id?{...item,status:"New Lead",completed_at:null}:item));
+    }catch(error){setAuthError(error instanceof Error?error.message:"Could not restore bid.");}
+    finally{setSyncing(false);}
+  }
+
   async function moveLead(id: string, direction: number) {
     const lead = leads.find(item=>item.id===id);
     if (!lead || syncing) return;
     const index=statuses.indexOf(lead.status);
+    if(index<0 || lead.completed_at)return;
     const nextStatus=statuses[Math.max(0,Math.min(statuses.length-1,index+direction))];
     setSyncing(true);
     try {
@@ -573,7 +605,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Contractors & Salespeople", "Message Templates", "Estimate Templates", "Weather"].map((item) => (
+          {["Dashboard", "Pipeline", "Completed Customers", "Lost Bids", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Contractors & Salespeople", "Message Templates", "Estimate Templates", "Weather"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);if(item==="Customer Page"){setCustomerHubId("");setSearch("");}setTab(item);}}>
               {item}
             </button>
@@ -656,7 +688,7 @@ export default function Home() {
         {tab === "Pipeline" && (
           <div className="pipeline">
             {statuses.map((status) => {
-              const column = leads.filter((lead) => lead.status === status);
+              const column = leads.filter((lead) => isActivePipeline(lead) && lead.status === status);
               return (
                 <div className="pipeCol" key={status}>
                   <div className="pipeHead"><span>{status}</span><span className="badge">{column.length}</span></div>
@@ -670,7 +702,8 @@ export default function Home() {
                         <button className="mini" onClick={() => {setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
                         {status !== statuses[0] && <button className="mini" onClick={() => moveLead(lead.id, -1)}>← Back</button>}
                         {status !== statuses[statuses.length - 1] && <button className="mini" onClick={() => moveLead(lead.id, 1)}>Next →</button>}
-                        <button className="mini" onClick={() => deleteLead(lead.id)}>Delete</button>
+                        <button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,true)}>Move to Completed</button>
+                        <button className="mini" disabled={syncing} onClick={()=>void archiveLostBid(lead.id)}>Lost Bid</button>
                       </div>
                     </div>
                   ))}
@@ -679,6 +712,22 @@ export default function Home() {
               );
             })}
           </div>
+        )}
+
+        {tab === "Completed Customers" && (
+          <div className="card"><h2>Completed Customers</h2><p className="muted">Finished jobs are filed here and removed from the active pipeline. Customer records, photos, estimates and payments stay saved.</p>
+          {leads.filter(lead=>Boolean(lead.completed_at)).length===0?<p className="muted">No completed customers yet.</p>:leads.filter(lead=>Boolean(lead.completed_at)).map(lead=><div className="card" key={lead.id} style={{marginTop:12}}>
+            <div className="kpi"><span><strong>{lead.name}</strong><br/>{lead.address}<br/>Completed {lead.completed_at?new Date(lead.completed_at).toLocaleDateString():""}</span><strong>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</strong></div>
+            <div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button><button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,false)}>Return to Pipeline</button></div>
+          </div>)}</div>
+        )}
+
+        {tab === "Lost Bids" && (
+          <div className="card"><h2>Lost Bids</h2><p className="muted">Bids you did not win are filed here. These customers are not counted in the active pipeline.</p>
+          {leads.filter(isLostBid).length===0?<p className="muted">No lost bids yet.</p>:leads.filter(isLostBid).map(lead=><div className="card" key={lead.id} style={{marginTop:12}}>
+            <div className="kpi"><span><strong>{lead.name}</strong><br/>{lead.address}</span><strong>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</strong></div>
+            <div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button><button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Return to Pipeline</button></div>
+          </div>)}</div>
         )}
 
         {tab === "Customers" && (
@@ -691,7 +740,7 @@ export default function Home() {
                   <tr><th>Property</th><th>Name</th><th>Phone</th><th>Email</th><th>Lead Created Date</th>{customerListView==="Completed"&&<th>Completed Date</th>}<th>Notes</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                  {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):!lead.completed_at)&&[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
+                  {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):isActivePipeline(lead))&&[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
                     <tr key={lead.id}>
                       <td><button type="button" className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}} style={{fontWeight:700,textAlign:"left"}}>{lead.address||"Address missing"}</button></td>
                       <td>{lead.name}</td>
