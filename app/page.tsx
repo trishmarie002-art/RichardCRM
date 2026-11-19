@@ -126,7 +126,7 @@ export default function Home() {
   const [leads, setLeads] = useState<Lead[]>(cloudMode ? [] : starterLeads);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [search, setSearch] = useState("");
-  const [customerListView,setCustomerListView]=useState<"Active"|"Completed">("Active");
+  const [customerListView,setCustomerListView]=useState<"Active"|"Completed"|"Lost Bids">("Active");
   const [localReady, setLocalReady] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newLeadAddress,setNewLeadAddress]=useState("");
@@ -732,7 +732,7 @@ export default function Home() {
 
         {tab === "Customers" && (
           <div className="card">
-            <div className="sectionTitle"><h2>Customer & Property Records</h2></div><div className="roofToolbar"><button className={customerListView==="Active"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Active")}>Active customers</button><button className={customerListView==="Completed"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Completed")}>Completed customers</button></div>
+            <div className="sectionTitle"><h2>Customer & Property Records</h2></div><div className="roofToolbar"><button className={customerListView==="Active"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Active")}>Active customers</button><button className={customerListView==="Completed"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Completed")}>Completed customers</button><button className={customerListView==="Lost Bids"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Lost Bids")}>Lost Bids</button></div>
             <div className="field"><label htmlFor="customer-search">Search customers</label><input id="customer-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Name, address, phone or email" /></div>
             <div className="tableWrap">
               <table className="table">
@@ -740,7 +740,7 @@ export default function Home() {
                   <tr><th>Property</th><th>Name</th><th>Phone</th><th>Email</th><th>Lead Created Date</th>{customerListView==="Completed"&&<th>Completed Date</th>}<th>Notes</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                  {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):isActivePipeline(lead))&&[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
+                  {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):customerListView==="Lost Bids"?isLostBid(lead):isActivePipeline(lead))&&[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
                     <tr key={lead.id}>
                       <td><button type="button" className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}} style={{fontWeight:700,textAlign:"left"}}>{lead.address||"Address missing"}</button></td>
                       <td>{lead.name}</td>
@@ -749,7 +749,7 @@ export default function Home() {
                       <td title={lead.created_at||"Creation date unavailable"}>{lead.created_at?new Date(lead.created_at).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"}</td>
                       {customerListView==="Completed"&&<td>{lead.completed_at?new Date(lead.completed_at).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"}</td>}
                       <td>{lead.notes || "—"}</td>
-                      <td><div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Page</button><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,!Boolean(lead.completed_at))}>{lead.completed_at?"Reopen":"Complete"}</button><button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
+                      <td><div className="roofToolbar"><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Page</button><button className="mini" disabled={syncing} onClick={()=>{setEditingLead(lead);setShowForm(true);}}>Edit</button><button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,!Boolean(lead.completed_at))}>{lead.completed_at?"Reopen":"Complete"}</button>{isLostBid(lead)?<button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Restore Bid</button>:!lead.completed_at&&<button className="mini" disabled={syncing} onClick={()=>void archiveLostBid(lead.id)}>Lost Bids</button>}<button className="mini" disabled={syncing} style={{color:"#b42318",borderColor:"#b42318"}} aria-label={"Delete customer "+lead.name} onClick={()=>void deleteLead(lead.id)}>Delete</button></div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -768,7 +768,7 @@ export default function Home() {
         {tab === "Invoices" && <Invoices customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Jobs" && <Jobs customers={leads} userId={userId} cloudMode={cloudMode} initialCustomerId={customerContext} />}
         {tab === "Daily Schedule" && <DailySchedule userId={userId} cloudMode={cloudMode} initialDay={calendarDay} />}
-        {tab === "Customer Page" && (customerHubId && leads.some(lead=>lead.id===customerHubId) ? <CustomerHub key={customerHubId} customer={leads.find(lead=>lead.id===customerHubId)!} userId={userId} cloudMode={cloudMode} onEstimateSaved={(date,amount)=>setLeads(current=>current.map(lead=>lead.id===customerHubId?{...lead,estimate_created_on:date,estimate_amount:amount}:lead))} onBack={()=>setTab("Customers")} onEdit={()=>{setEditingLead(leads.find(lead=>lead.id===customerHubId)!);setShowForm(true);}} onMeasure={()=>{setSelectedLeadId(customerHubId);setTab("Roof Measure");}} /> : <div className="card"><h2>Select a customer property</h2><p className="muted">Choose the property whose records you want to open. No customer is selected by default.</p>
+        {tab === "Customer Page" && (customerHubId && leads.some(lead=>lead.id===customerHubId) ? <CustomerHub key={customerHubId} customer={leads.find(lead=>lead.id===customerHubId)!} userId={userId} cloudMode={cloudMode} onEstimateSaved={(date,amount)=>setLeads(current=>current.map(lead=>lead.id===customerHubId?{...lead,estimate_created_on:date,estimate_amount:amount}:lead))} onLostBid={()=>void archiveLostBid(customerHubId)} onRestoreBid={()=>void restoreLostBid(customerHubId)} onBack={()=>setTab("Customers")} onEdit={()=>{setEditingLead(leads.find(lead=>lead.id===customerHubId)!);setShowForm(true);}} onMeasure={()=>{setSelectedLeadId(customerHubId);setTab("Roof Measure");}} /> : <div className="card"><h2>Select a customer property</h2><p className="muted">Choose the property whose records you want to open. No customer is selected by default.</p>
           <div className="field"><label htmlFor="customer-page-search">Search properties or customer names</label><input id="customer-page-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search address, name, email or phone" /></div>
           <div className="tableWrap" style={{marginTop:16}}><table className="table"><thead><tr><th>Property</th><th>Customer</th><th>Status</th><th>Action</th></tr></thead><tbody>
           {leads.filter(lead=>[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map(lead=><tr key={lead.id}><td><strong>{lead.address||"Address not provided"}</strong></td><td>{lead.name}</td><td>{lead.completed_at?"Completed":lead.status}</td><td><button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);}}>Open Page</button></td></tr>)}
