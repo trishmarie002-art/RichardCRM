@@ -24,10 +24,10 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
  async function saveManualEstimate(){
   const amountText=estimateAmount.trim();
   const amount=amountText===""?null:Number(amountText);
-  if(amount!==null&&(!Number.isFinite(amount)||amount<0||amount>9999999999.99||!/^\\d+(?:\\.\\d{1,2})?$/.test(amountText))){
+  if(amount!==null&&(!Number.isFinite(amount)||amount<0||amount>9999999999.99||!/^\d+(?:\.\d{1,2})?$/.test(amountText))){
    setEstimateMessage("Enter a valid estimate amount with up to two decimal places.");return;
   }
-  if(estimateDate&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(estimateDate)){setEstimateMessage("Choose a valid estimate date.");return;}
+  if(estimateDate&&!/^\d{4}-\d{2}-\d{2}$/.test(estimateDate)){setEstimateMessage("Choose a valid estimate date.");return;}
   setEstimateSaving(true);setEstimateMessage("");
   try{
    if(cloudMode){
