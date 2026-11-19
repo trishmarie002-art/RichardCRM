@@ -127,6 +127,7 @@ export default function Home() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [search, setSearch] = useState("");
   const [customerListView,setCustomerListView]=useState<"Active"|"Completed"|"Lost Bids">("Active");
+  const [showPipelineLostBids,setShowPipelineLostBids]=useState(false);
   const [localReady, setLocalReady] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newLeadAddress,setNewLeadAddress]=useState("");
@@ -686,6 +687,7 @@ export default function Home() {
         )}
 
         {tab === "Pipeline" && (
+          <div>
           <div className="pipeline">
             {statuses.map((status) => {
               const column = leads.filter((lead) => isActivePipeline(lead) && lead.status === status);
@@ -711,6 +713,23 @@ export default function Home() {
                 </div>
               );
             })}
+          </div>
+          <div className="card" style={{marginTop:18}}>
+            <div className="sectionTitle">
+              <h2>Lost Bids ({leads.filter(isLostBid).length})</h2>
+              <button className={showPipelineLostBids?"btn":"btn secondary"} type="button" aria-expanded={showPipelineLostBids} onClick={()=>setShowPipelineLostBids(v=>!v)}>{showPipelineLostBids?"Hide Lost Bids":"Show Lost Bids"}</button>
+            </div>
+            {showPipelineLostBids&&<div>
+              <p className="muted">These bids are archived and are not counted in the active pipeline.</p>
+              {!leads.some(isLostBid)?<p className="muted">No lost bids yet.</p>:leads.filter(isLostBid).map(lead=><div className="card" key={lead.id} style={{marginTop:12}}>
+                <div className="kpi"><span><strong>{lead.name}</strong><br/>{lead.address}<br/>{lead.phone}</span><strong>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</strong></div>
+                <div className="roofToolbar">
+                  <button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
+                  <button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Restore to Pipeline</button>
+                </div>
+              </div>)}
+            </div>}
+          </div>
           </div>
         )}
 
