@@ -10,6 +10,7 @@ import Calendar from "@/components/Calendar";
 import WeatherForecast from "@/components/WeatherForecast";
 import Invoices from "@/components/Invoices";
 import Jobs from "@/components/Jobs";
+import CrewPay from "@/components/CrewPay";
 import DailySchedule from "@/components/DailySchedule";
 import RoofReport from "@/components/RoofReport";
 import { edgeLength, type RoofEdge } from "@/lib/roof";
@@ -563,7 +564,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Message Templates", "Estimate Templates", "Weather"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Contractors & Salespeople", "Message Templates", "Estimate Templates", "Weather"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);if(item==="Customer Page"){setCustomerHubId("");setSearch("");}setTab(item);}}>
               {item}
             </button>
@@ -588,6 +589,7 @@ export default function Home() {
         {authError && <div className="notice" style={{ marginBottom: 16 }}>{authError}</div>}
 
         {tab === "Weather" && <WeatherForecast/>}
+        {tab === "Contractors & Salespeople" && <CrewPay cloudMode={cloudMode} userId={userId}/>}
 
         {tab === "Dashboard" && (
           <>
