@@ -667,6 +667,7 @@ export default function Home() {
                       <div className="meta">{lead.phone}</div>
                       <div style={{ marginTop: 8, fontWeight: 800 }}>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</div>
                       <div className="leadActions">
+                        <button className="mini" onClick={() => {setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
                         {status !== statuses[0] && <button className="mini" onClick={() => moveLead(lead.id, -1)}>← Back</button>}
                         {status !== statuses[statuses.length - 1] && <button className="mini" onClick={() => moveLead(lead.id, 1)}>Next →</button>}
                         <button className="mini" onClick={() => deleteLead(lead.id)}>Delete</button>
