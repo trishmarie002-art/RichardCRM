@@ -328,8 +328,8 @@ export default function Home() {
   }
 
   async function addLead(formData: FormData) {
-    const amountText = String(formData.get("estimate_amount") || "").trim().replace(/^\\$\\s*/, "");
-    if (amountText && !/^(?:\\d+|\\d{1,3}(?:,\\d{3})+)(?:\\.\\d{1,2})?$/.test(amountText)) {
+    const amountText = String(formData.get("estimate_amount") || "").trim().replace(/^\$\s*/, "");
+    if (amountText && !/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(amountText)) {
       setAuthError("Enter a valid estimate amount, such as $10,000 or $10,000.50."); return;
     }
     const estimateAmount = amountText ? Number(amountText.replace(/,/g,"")) : null;
@@ -337,7 +337,7 @@ export default function Home() {
       setAuthError("Estimate amount must be between $0 and $9,999,999,999.99."); return;
     }
     const estimateDate = String(formData.get("estimate_created_on") || "").trim() || null;
-    if (estimateDate && !/^\\d{4}-\\d{2}-\\d{2}$/.test(estimateDate)) {
+    if (estimateDate && !/^\d{4}-\d{2}-\d{2}$/.test(estimateDate)) {
       setAuthError("Choose a valid estimate-created date."); return;
     }
     const draft = {
