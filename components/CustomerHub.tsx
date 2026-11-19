@@ -13,7 +13,7 @@ type Customer={id:string;estimate_amount?:number|null;estimate_created_on?:strin
 type Section="Overview"|"Notes"|"Activity & Appointments"|"Photos"|"Documents"|"Estimates"|"Jobs"|"Invoices & Payments";
 const sections:Section[]=["Overview","Notes","Activity & Appointments","Photos","Documents","Estimates","Jobs","Invoices & Payments"];
 const usd=(v:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(v||0);
-export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onMeasure,onEstimateSaved}:{customer:Customer;userId:string|null;cloudMode:boolean;onBack:()=>void;onEdit:()=>void;onMeasure:()=>void;onEstimateSaved?:(date:string|null,amount:number|null)=>void}){
+export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onMeasure,onEstimateSaved,onLostBid,onRestoreBid}:{customer:Customer;userId:string|null;cloudMode:boolean;onBack:()=>void;onEdit:()=>void;onMeasure:()=>void;onEstimateSaved?:(date:string|null,amount:number|null)=>void;onLostBid?:()=>void;onRestoreBid?:()=>void}){
  const [section,setSection]=useState<Section>("Overview");
  const [showFullDetails,setShowFullDetails]=useState(false);
  const db=useMemo(()=>createClient(),[]);
@@ -49,7 +49,7 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
  }
  return <div>
   <div className="card customerHubSummary">
-   <div className="roofToolbar customerHubActions"><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button></div>
+   <div className="roofToolbar customerHubActions"><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button>{customer.status==="Lost"&&!customer.completed_at?<button className="mini" onClick={onRestoreBid}>Restore Bid</button>:!customer.completed_at&&<button className="mini" onClick={onLostBid}>Lost Bids</button>}</div>
    <div className="customerHubHeading">
     <div>
      <h2 className="customerHubName">{customer.name||"Unnamed customer"}</h2>
