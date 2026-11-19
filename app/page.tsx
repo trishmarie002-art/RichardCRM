@@ -686,38 +686,41 @@ export default function Home() {
         )}
 
         {tab === "Pipeline" && (
-          <div className="pipeline">
-            {[...statuses,"Lost Bids"].map((status) => {
-              const lostColumn=status==="Lost Bids";
-              const column = leads.filter((lead) => lostColumn ? isLostBid(lead) : isActivePipeline(lead) && lead.status === status);
-              return (
-                <div className="pipeCol" key={status}>
-                  <div className="pipeHead"><span>{status}</span><span className="badge">{column.length}</span></div>
-                  {column.map((lead) => (
-                    <div className="lead" key={lead.id}>
-                      <strong>{lead.name}</strong>
-                      <div className="meta">{lead.address}</div>
-                      <div className="meta">{lead.phone}</div>
-                      <div style={{ marginTop: 8, fontWeight: 800 }}>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</div>
-                      <div className="leadActions">
-                        <button className="mini" onClick={() => {setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
-                        {lostColumn ? (
-                          <button className="mini" disabled={syncing} onClick={()=>void restoreLostBid(lead.id)}>Restore to Pipeline</button>
-                        ) : (
-                          <>
-                            {status !== statuses[0] && <button className="mini" disabled={syncing} onClick={() => void moveLead(lead.id, -1)}>← Back</button>}
-                            {status !== statuses[statuses.length - 1] && <button className="mini" disabled={syncing} onClick={() => void moveLead(lead.id, 1)}>Next →</button>}
-                            <button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,true)}>Move to Completed</button>
-                            <button className="mini" disabled={syncing} onClick={()=>void archiveLostBid(lead.id)}>Lost Bid</button>
-                          </>
-                        )}
+          <div>
+            <div className="pipeline">
+              {statuses.map((status) => {
+                const column = leads.filter((lead) => isActivePipeline(lead) && lead.status === status);
+                return (
+                  <div className="pipeCol" key={status}>
+                    <div className="pipeHead"><span>{status}</span><span className="badge">{column.length}</span></div>
+                    {column.map((lead) => (
+                      <div className="lead" key={lead.id}>
+                        <strong>{lead.name}</strong>
+                        <div className="meta">{lead.address}</div>
+                        <div className="meta">{lead.phone}</div>
+                        <div style={{marginTop:8,fontWeight:800}}>{lead.estimate_amount==null?"No estimate entered":money(lead.estimate_amount)}</div>
+                        <div className="leadActions">
+                          <button className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}}>Open Customer Page</button>
+                          {status!==statuses[0]&&<button className="mini" disabled={syncing} onClick={()=>void moveLead(lead.id,-1)}>← Back</button>}
+                          {status!==statuses[statuses.length-1]&&<button className="mini" disabled={syncing} onClick={()=>void moveLead(lead.id,1)}>Next →</button>}
+                          <button className="mini" disabled={syncing} onClick={()=>void toggleCompleted(lead.id,true)}>Move to Completed</button>
+                          <button className="mini" disabled={syncing} onClick={()=>void archiveLostBid(lead.id)}>Lost Bid</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {column.length === 0 && <div className="empty">No {lostColumn?"lost bids":"leads"} here yet.</div>}
-                </div>
-              );
-            })}
+                    ))}
+                    {!column.length&&<div className="empty">No leads here yet.</div>}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="card" style={{marginTop:18,maxWidth:500}}>
+              <h3>Closed customer folders</h3>
+              <p className="small muted">Completed work and unsuccessful bids are stored separately from the active pipeline. Use the buttons to view or restore those customers.</p>
+              <div className="roofToolbar">
+                <button className="btn secondary" onClick={()=>setTab("Completed Customers")}>Completed Customers ({leads.filter(lead=>Boolean(lead.completed_at)).length})</button>
+                <button className="btn secondary" onClick={()=>setTab("Lost Bids")}>Lost Bids ({leads.filter(isLostBid).length})</button>
+              </div>
+            </div>
           </div>
         )}
 
