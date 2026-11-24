@@ -127,6 +127,7 @@ export default function Home() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [search, setSearch] = useState("");
   const [customerListView,setCustomerListView]=useState<"Active"|"Completed"|"Lost Bids">("Active");
+  const [salespersonFolder,setSalespersonFolder]=useState("__all__");
   const [localReady, setLocalReady] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newLeadAddress,setNewLeadAddress]=useState("");
@@ -605,7 +606,7 @@ export default function Home() {
         <div className="tagline">Private roofing sales + measurement workspace</div>
 
         <div className="nav">
-          {["Dashboard", "Pipeline", "Completed Customers", "Lost Bids", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Contractors & Salespeople", "Message Templates", "Estimate Templates", "Weather"].map((item) => (
+          {["Dashboard", "Pipeline", "Customers", "Customer Page", "Customer Map", "Follow-ups", "Calendar", "Contractors & Salespeople", "Message Templates", "Estimate Templates", "Weather", "Completed Customers", "Lost Bids"].map((item) => (
             <button key={item} className={tab === item ? "active" : ""} onClick={() => {setEstimateOption(null);if(item==="Customer Page"){setCustomerHubId("");setSearch("");}setTab(item);}}>
               {item}
             </button>
@@ -743,19 +744,21 @@ export default function Home() {
         {tab === "Customers" && (
           <div className="card">
             <div className="sectionTitle"><h2>Customer & Property Records</h2></div><div className="roofToolbar"><button className={customerListView==="Active"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Active")}>Active customers</button><button className={customerListView==="Completed"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Completed")}>Completed customers</button><button className={customerListView==="Lost Bids"?"btn":"btn secondary"} onClick={()=>setCustomerListView("Lost Bids")}>Lost Bids</button></div>
-            <div className="field"><label htmlFor="customer-search">Search customers</label><input id="customer-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Name, address, phone or email" /></div>
+            <div className="field" style={{maxWidth:420,marginBottom:12}}><label htmlFor="salesperson-folder">Salesperson folder</label><select id="salesperson-folder" value={salespersonFolder} onChange={event=>setSalespersonFolder(event.target.value)}><option value="__all__">Master folder — all salespeople</option><option value="__unassigned__">Unassigned leads</option>{Array.from(new Set(leads.map(lead=>(lead.salesperson||"").trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b)).map(name=><option key={name} value={name}>{name} — {leads.filter(lead=>(lead.salesperson||"").trim()===name).length} leads</option>)}</select></div>
+             <div className="field"><label htmlFor="customer-search">Search customers</label><input id="customer-search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Name, address, phone or email" /></div>
             <div className="tableWrap">
               <table className="table">
                 <thead>
-                  <tr><th>Property</th><th>Name</th><th>Phone</th><th>Email</th><th>Lead Created Date</th>{customerListView==="Completed"&&<th>Completed Date</th>}<th>Notes</th><th>Actions</th></tr>
+                  <tr><th>Property</th><th>Name</th><th>Phone</th><th>Email</th><th>Salesperson</th><th>Lead Created Date</th>{customerListView==="Completed"&&<th>Completed Date</th>}<th>Notes</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
-                  {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):customerListView==="Lost Bids"?isLostBid(lead):isActivePipeline(lead))&&[lead.name,lead.address,lead.phone,lead.email].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
+                  {leads.filter(lead=>(customerListView==="Completed"?Boolean(lead.completed_at):customerListView==="Lost Bids"?isLostBid(lead):isActivePipeline(lead))&&(salespersonFolder==="__all__"||(salespersonFolder==="__unassigned__"?!lead.salesperson?.trim():(lead.salesperson||"").trim()===salespersonFolder))&&[lead.name,lead.address,lead.phone,lead.email,lead.salesperson||""].join(" ").toLowerCase().includes(search.toLowerCase())).map((lead) => (
                     <tr key={lead.id}>
                       <td><button type="button" className="mini" onClick={()=>{setCustomerHubId(lead.id);setCustomerContext(lead.id);setTab("Customer Page");}} style={{fontWeight:700,textAlign:"left"}}>{lead.address||"Address missing"}</button></td>
                       <td>{lead.name}</td>
                       <td>{lead.phone || "—"}</td>
                       <td>{lead.email || "—"}</td>
+                       <td>{lead.salesperson||"Unassigned"}</td>
                       <td title={lead.created_at||"Creation date unavailable"}>{lead.created_at?new Date(lead.created_at).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"}</td>
                       {customerListView==="Completed"&&<td>{lead.completed_at?new Date(lead.completed_at).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"}</td>}
                       <td>{lead.notes || "—"}</td>
