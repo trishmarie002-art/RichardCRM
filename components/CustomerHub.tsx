@@ -93,7 +93,8 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
   </div>
   <div className="roofToolbar" role="group" aria-label="Customer page sections" style={{marginBottom:16}}>
    {sections.map(item=><button key={item} type="button" className={section===item?"btn":"btn secondary"} aria-pressed={section===item} onClick={()=>setSection(item)}>{item}</button>)}
-   <button type="button" className="btn secondary" onClick={onMeasure}>Roof Measurements</button>
+   <button type="button" className="btn secondary" onClick={()=>setSection("Jobs")}>Subcontractor / Job Crew</button>
+    <button type="button" className="btn secondary" onClick={onMeasure}>Roof Measurements</button>
   </div>
   {section==="Overview"&&<CustomerOverview key={customer.id} customerId={customer.id} userId={userId} onOpen={open}/>}
   {section==="Notes"&&<CustomerNotes key={customer.id} customerId={customer.id} userId={userId}/>}
