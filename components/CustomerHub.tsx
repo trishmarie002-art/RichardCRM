@@ -48,8 +48,8 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
   else if(sectionName==="Estimates"||sectionName==="Jobs")setSection(sectionName);
  }
  return <div>
-  <div className="card customerHubSummary">
-   <div className="roofToolbar customerHubActions"><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button>{customer.status==="Lost"&&!customer.completed_at?<button className="mini" onClick={onRestoreBid}>Restore Bid</button>:!customer.completed_at&&<button className="mini" onClick={onLostBid}>Lost Bids</button>}</div>
+  <div className="card customerHubSummary" style={{padding:14,marginBottom:12}}>
+   <div className="roofToolbar customerHubActions" style={{marginBottom:8,display:"flex",flexWrap:"wrap",gap:8}}><button className="mini" onClick={onBack}>← All customers</button><button className="mini" onClick={onEdit}>Edit customer</button>{customer.status==="Lost"&&!customer.completed_at?<button className="mini" onClick={onRestoreBid}>Restore Bid</button>:!customer.completed_at&&<button className="mini" onClick={onLostBid}>Lost Bids</button>}</div>
    <div className="customerHubHeading">
     <div>
      <h2 className="customerHubName">{customer.name||"Unnamed customer"}</h2>
@@ -57,13 +57,14 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
     </div>
     <span className="badge customerHubStatus">{customer.status||"No stage"}{customer.completed_at?" · Completed":""}</span>
    </div>
-   <div className="customerHubQuickDetails">
+   <div className="customerHubQuickDetails" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(175px,1fr))",gap:8}}>
     <div><span>Phone</span><strong>{customer.phone||"Not provided"}</strong></div>
     <div><span>Email</span><strong>{customer.email||"Not provided"}</strong></div>
     <div><span>Job type</span><strong>{customer.job_type||"Not set"}</strong></div>
     <div><span>Salesperson</span><strong>{customer.salesperson||"Unassigned"}</strong></div>
    </div>
-   <div className="customerHubBottomActions">
+   {customer.additional_contacts&&customer.additional_contacts.length>0&&<div style={{marginTop:12}}><strong>Additional contacts</strong><div className="customerHubQuickDetails" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:8,marginTop:6}}>{customer.additional_contacts.map((person,index)=><div key={index} style={{padding:"8px 10px",border:"1px solid #dce2eb",borderRadius:8}}><span style={{display:"block",fontSize:12}}>{person.role||"Additional contact"}</span><strong>{person.name||"Name not provided"}</strong><div style={{fontSize:12}}>{person.phone||"No phone"} · {person.email||"No email"}</div></div>)}</div></div>}
+    <div className="customerHubBottomActions">
     <div className="roofToolbar">
      {customer.phone&&<a className="btn secondary" href={"tel:"+customer.phone}>Call</a>}
      {customer.email&&<a className="btn secondary" href={"mailto:"+customer.email}>Email</a>}
@@ -77,7 +78,7 @@ export default function CustomerHub({customer,userId,cloudMode,onBack,onEdit,onM
      <div><span>Estimate amount</span><strong>{customer.estimate_amount==null?"Not entered":usd(customer.estimate_amount)}</strong></div>
     </div>
     {customer.notes&&<p style={{whiteSpace:"pre-wrap",marginTop:12}}><strong>Original lead notes:</strong> {customer.notes}</p>}
-    {!!customer.additional_contacts?.length&&<div><h3>Additional contacts</h3>{customer.additional_contacts.map((person,index)=><div className="kpi" key={index}><span>{person.role||"Additional contact"}: {person.name||"Name not provided"}</span><strong>{person.phone||""} {person.email||""}</strong></div>)}</div>}
+    
    </div>}
   </div>
   <div className="card" style={{marginBottom:16}}>
